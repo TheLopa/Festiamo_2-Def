@@ -28,15 +28,19 @@ function PublicRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+      {/* Pubbliche */}
+      <Route path="/login"             element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/register"          element={<PublicRoute><Register /></PublicRoute>} />
       <Route path="/acquisto/successo" element={<PrivateRoute><PurchaseSuccess /></PrivateRoute>} />
 
+      {/* Protette con AppLayout */}
       <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
-        <Route path="/eventi" element={<EventsList />} />
-        <Route path="/eventi/:eventId/impostazioni" element={<Settings />} />
+        <Route path="/eventi"                               element={<EventsList />} />
+        <Route path="/eventi/:eventId"                      element={<Navigate to="impostazioni" replace />} />
+        <Route path="/eventi/:eventId/impostazioni"         element={<Settings />} />
       </Route>
 
+      {/* Fallback */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
