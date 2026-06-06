@@ -34,11 +34,11 @@ export default function App() {
       <Route path="/acquisto/successo" element={<PrivateRoute><PurchaseSuccess /></PrivateRoute>} />
 
       {/* Protette con AppLayout */}
-      <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
-        <Route path="/eventi"                               element={<EventsList />} />
-        <Route path="/eventi/:eventId"                      element={<Navigate to="impostazioni" replace />} />
-        <Route path="/eventi/:eventId/impostazioni"         element={<Settings />} />
-      </Route>
+    <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
+      <Route path="/eventi"                       element={<EventsList />} />
+      <Route path="/eventi/:eventId"              element={<EventDashboard />} />
+      <Route path="/eventi/:eventId/impostazioni" element={<Settings />} />
+    </Route>
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/login" replace />} />
