@@ -11,6 +11,8 @@ import EventDashboard from "./pages/EventDashboard";
 import Budget from "./pages/Budget";
 import Roadmap from "./pages/Roadmap";
 import Guests from "./pages/Guests";
+import Attendance from "./pages/Attendance";
+import Scenarios from "./pages/Scenarios";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -45,6 +47,8 @@ export default function App() {
       <Route path="/eventi/:eventId/budget" element={<Budget />} />
       <Route path="/eventi/:eventId/roadmap" element={<Roadmap />} />
       <Route path="/eventi/:eventId/invitati" element={<Guests />} />
+      <Route path="/eventi/:eventId/presenze" element={<Attendance />} />
+      <Route path="/eventi/:eventId/scenari" element={<Scenarios />} />
     </Route>
 
       {/* Fallback */}
