@@ -5,6 +5,8 @@ import Login           from "./pages/Login";
 import Register        from "./pages/Register";
 import EventsList      from "./pages/EventsList";
 import PurchaseSuccess from "./pages/PurchaseSuccess";
+import Settings        from "./pages/Settings";
+import AppLayout       from "./layouts/AppLayout";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -26,11 +28,16 @@ function PublicRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/login"             element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/register"          element={<PublicRoute><Register /></PublicRoute>} />
-      <Route path="/eventi"            element={<PrivateRoute><EventsList /></PrivateRoute>} />
+      <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
       <Route path="/acquisto/successo" element={<PrivateRoute><PurchaseSuccess /></PrivateRoute>} />
-      <Route path="*"                  element={<Navigate to="/login" replace />} />
+
+      <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
+        <Route path="/eventi" element={<EventsList />} />
+        <Route path="/eventi/:eventId/impostazioni" element={<Settings />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
