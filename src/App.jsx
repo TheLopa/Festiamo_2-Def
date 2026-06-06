@@ -9,6 +9,7 @@ import Settings        from "./pages/Settings";
 import AppLayout       from "./layouts/AppLayout";
 import EventDashboard from "./pages/EventDashboard";
 import Budget from "./pages/Budget";
+import Roadmap from "./pages/Roadmap";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -41,6 +42,7 @@ export default function App() {
       <Route path="/eventi/:eventId"              element={<EventDashboard />} />
       <Route path="/eventi/:eventId/impostazioni" element={<Settings />} />
       <Route path="/eventi/:eventId/budget" element={<Budget />} />
+      <Route path="/eventi/:eventId/roadmap" element={<Roadmap />} />
     </Route>
 
       {/* Fallback */}
