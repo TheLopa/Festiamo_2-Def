@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useLang } from "../context/LangContext";
-import { Plus, ChevronRight, Calendar, Users, BarChart2 } from "lucide-react";
+import { Plus, ChevronRight } from "lucide-react";
 
 const PRESETS = {
   compleanno: { label: "Compleanno",          emoji: "🎂" },
@@ -35,18 +35,21 @@ export default function EventsList() {
     setLoading(false);
   }
 
-  const active = events.filter(e => e.paid && new Date(e.event_date) >= new Date());
-  const past   = events.filter(e => e.paid && new Date(e.event_date) < new Date());
+  const active = events.filter(e => e.paid && e.event_date && new Date(e.event_date) >= new Date());
+  const past   = events.filter(e => e.paid && e.event_date && new Date(e.event_date) < new Date());
   const drafts = events.filter(e => !e.paid);
+  const noDate = events.filter(e => e.paid && !e.event_date);
 
-  const firstName = profile?.full_name?.split(" ")[0]
+  // Nome utente — prende il first name dal profilo o dalla email
+  const firstName = profile?.full_name?.trim().split(" ")[0]
+    || user?.user_metadata?.full_name?.split(" ")[0]
     || user?.email?.split("@")[0]
     || "ciao";
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <p style={{ color: "var(--text-tertiary)" }}>{t("loading")}</p>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", padding:"80px 0" }}>
+        <p style={{ color:"var(--text-tertiary)" }}>{t("loading")}</p>
       </div>
     );
   }
@@ -54,19 +57,18 @@ export default function EventsList() {
   return (
     <div>
       {/* Greeting */}
-      <div className="flex items-center justify-between mb-6">
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24 }}>
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
-            {t("greeting")}, {firstName}
+          <h1 style={{ fontSize:24, fontWeight:800, color:"var(--text-primary)", margin:"0 0 4px", letterSpacing:"-0.02em" }}>
+            {t("greeting")}, {firstName} 👋
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
+          <p style={{ fontSize:13, color:"var(--text-secondary)", margin:0 }}>
             {active.length} {t("events_active")} · {past.length} {t("events_done")}
           </p>
         </div>
         <button
-          className="btn-ghost text-sm"
           onClick={signOut}
-          style={{ color: "var(--text-tertiary)" }}
+          style={{ background:"none", border:"none", cursor:"pointer", fontSize:13, color:"var(--text-tertiary)", padding:"4px 8px" }}
         >
           {t("logout")}
         </button>
@@ -74,176 +76,154 @@ export default function EventsList() {
 
       {/* Empty state */}
       {events.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-icon">
-            <span style={{ fontSize: "24px" }}>🎉</span>
-          </div>
-          <p className="text-base font-medium mb-1" style={{ color: "var(--text-primary)" }}>
-            {t("no_events")}
-          </p>
-          <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
-            {t("no_events_sub")}
-          </p>
+        <div style={{
+          textAlign:"center", padding:"48px 16px",
+          border:"1px dashed var(--border-strong)",
+          borderRadius:16,
+          marginBottom:16,
+        }}>
+          <div style={{ fontSize:40, marginBottom:12 }}>🎉</div>
+          <p style={{ fontSize:16, fontWeight:600, color:"var(--text-primary)", margin:"0 0 6px" }}>{t("no_events")}</p>
+          <p style={{ fontSize:14, color:"var(--text-secondary)", margin:"0 0 20px" }}>{t("no_events_sub")}</p>
           <button className="btn-primary" onClick={() => setShowModal(true)}>
             <Plus size={16} /> {t("new_event")}
           </button>
         </div>
       )}
 
-      {/* Sezione: In corso */}
+      {/* In corso */}
       {active.length > 0 && (
         <>
           <p className="section-label">{t("section_ongoing")}</p>
-          {active.map(ev => (
-            <EventCard
-              key={ev.id}
-              event={ev}
-              onClick={() => navigate(`/eventi/${ev.id}`)}
-              t={t}
-            />
-          ))}
+          {active.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
         </>
       )}
 
-      {/* Sezione: Bozze */}
+      {/* Senza data */}
+      {noDate.length > 0 && (
+        <>
+          <p className="section-label" style={{ marginTop:20 }}>Da configurare</p>
+          {noDate.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
+        </>
+      )}
+
+      {/* Bozze */}
       {drafts.length > 0 && (
         <>
-          <p className="section-label mt-5">{t("status_draft")}</p>
-          {drafts.map(ev => (
-            <EventCard
-              key={ev.id}
-              event={ev}
-              onClick={() => navigate(`/eventi/${ev.id}`)}
-              t={t}
-            />
-          ))}
+          <p className="section-label" style={{ marginTop:20 }}>{t("status_draft")}</p>
+          {drafts.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
         </>
       )}
 
-      {/* Sezione: Conclusi */}
+      {/* Conclusi */}
       {past.length > 0 && (
         <>
-          <p className="section-label mt-5">{t("section_past")}</p>
-          {past.map(ev => (
-            <EventCard
-              key={ev.id}
-              event={ev}
-              onClick={() => navigate(`/eventi/${ev.id}`)}
-              t={t}
-            />
-          ))}
+          <p className="section-label" style={{ marginTop:20 }}>{t("section_past")}</p>
+          {past.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
         </>
       )}
 
       {/* Bottone nuovo evento */}
       {events.length > 0 && (
         <button
-          className="w-full mt-4 py-4 rounded-2xl text-sm font-medium flex items-center justify-center gap-2"
-          style={{
-            border: "1.5px dashed var(--border-strong)",
-            color: "var(--text-secondary)",
-            background: "none",
-            cursor: "pointer",
-          }}
           onClick={() => setShowModal(true)}
+          style={{
+            width:"100%", marginTop:12, padding:"14px",
+            borderRadius:14, fontSize:14, fontWeight:500,
+            border:"1.5px dashed var(--border-strong)",
+            color:"var(--text-secondary)", background:"none",
+            cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+          }}
         >
-          <Plus size={18} /> {t("new_event")}
+          <Plus size={16} /> {t("new_event")}
         </button>
       )}
 
       {/* Modal acquisto */}
-      {showModal && (
-        <PurchaseModal onClose={() => setShowModal(false)} t={t} />
-      )}
+      {showModal && <PurchaseModal onClose={() => setShowModal(false)} t={t} />}
     </div>
   );
 }
 
 // ── Card evento ──────────────────────────────────────────────
 function EventCard({ event, onClick, t }) {
-  const preset = PRESETS[event.preset] || PRESETS.altro;
-  const isPast = new Date(event.event_date) < new Date();
+  const preset  = PRESETS[event.preset] || PRESETS.altro;
+  const isPast  = event.event_date && new Date(event.event_date) < new Date();
+  const noDate  = !event.event_date;
 
-  const statusLabel = !event.paid
-    ? t("status_draft")
-    : isPast
-    ? t("status_past")
+  const statusLabel = !event.paid ? t("status_draft")
+    : isPast ? t("status_past")
+    : noDate ? "Da configurare"
     : t("status_active");
 
-  const statusClass = !event.paid
-    ? "pill-warning"
+  const statusStyle = !event.paid
+    ? { background:"var(--warning-light)", color:"var(--warning-text)" }
     : isPast
-    ? "pill-neutral"
-    : "pill-success";
+    ? { background:"var(--bg-tertiary)", color:"var(--text-tertiary)" }
+    : noDate
+    ? { background:"var(--warning-light)", color:"var(--warning-text)" }
+    : { background:"var(--success-light)", color:"var(--success-text)" };
 
   const dateStr = event.event_date
-    ? new Date(event.event_date).toLocaleDateString("it-IT", {
-        day: "2-digit", month: "short", year: "numeric",
-      })
-    : "—";
+    ? new Date(event.event_date).toLocaleDateString("it-IT", { day:"2-digit", month:"short", year:"numeric" })
+    : "Data non impostata";
 
   return (
     <div
-      className="card mb-3 cursor-pointer"
       onClick={onClick}
-      style={{ transition: "border-color 0.15s" }}
+      style={{
+        background:"var(--bg-primary)",
+        border:"1px solid var(--border)",
+        borderRadius:16,
+        marginBottom:10,
+        cursor:"pointer",
+        overflow:"hidden",
+      }}
     >
-      <div className="flex items-center gap-3 mb-3">
-        <div
-          className="flex h-11 w-11 items-center justify-center rounded-2xl text-xl flex-shrink-0"
-          style={{ background: "var(--bg-secondary)" }}
-        >
+      {/* Header card */}
+      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 14px 10px" }}>
+        <div style={{
+          width:44, height:44, borderRadius:12,
+          background:"var(--bg-secondary)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:22, flexShrink:0,
+        }}>
           {preset.emoji}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p
-              className="font-semibold text-base truncate"
-              style={{ color: "var(--text-primary)" }}
-            >
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+            <p style={{ fontSize:15, fontWeight:600, color:"var(--text-primary)", margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
               {event.name}
             </p>
-            <span className={`status-pill ${statusClass} flex-shrink-0`}>
+            <span style={{ ...statusStyle, fontSize:11, padding:"2px 8px", borderRadius:20, flexShrink:0, fontWeight:500 }}>
               {statusLabel}
             </span>
           </div>
-          <p className="text-xs mt-0.5" style={{ color: "var(--text-tertiary)" }}>
+          <p style={{ fontSize:12, color:"var(--text-tertiary)", margin:"2px 0 0" }}>
             {dateStr} · {event.planned_guests} ospiti · {preset.label}
           </p>
         </div>
-        <ChevronRight
-          size={18}
-          style={{ color: "var(--text-tertiary)", flexShrink: 0 }}
-        />
+        <ChevronRight size={16} style={{ color:"var(--text-tertiary)", flexShrink:0 }} />
       </div>
 
-      {/* Mini KPI */}
-      <div
-        className="grid grid-cols-3 rounded-xl overflow-hidden"
-        style={{ border: "1px solid var(--border)" }}
-      >
+      {/* KPI */}
+      <div style={{
+        display:"grid", gridTemplateColumns:"repeat(3,1fr)",
+        borderTop:"1px solid var(--border)",
+      }}>
         {[
           { label: t("kpi_budget"),    value: "€0"  },
           { label: t("kpi_confirmed"), value: "0"   },
           { label: t("kpi_roadmap"),   value: "0/0" },
         ].map((kpi, i) => (
-          <div
-            key={i}
-            className="flex flex-col items-center py-2 px-1"
-            style={{
-              borderRight: i < 2 ? "1px solid var(--border)" : "none",
-              background: "var(--bg-secondary)",
-            }}
-          >
-            <p className="text-xs mb-0.5" style={{ color: "var(--text-tertiary)" }}>
-              {kpi.label}
-            </p>
-            <p
-              className="text-sm font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {kpi.value}
-            </p>
+          <div key={i} style={{
+            padding:"10px 8px",
+            textAlign:"center",
+            borderRight: i < 2 ? "1px solid var(--border)" : "none",
+            background:"var(--bg-secondary)",
+          }}>
+            <p style={{ fontSize:11, color:"var(--text-tertiary)", margin:"0 0 2px" }}>{kpi.label}</p>
+            <p style={{ fontSize:14, fontWeight:600, color:"var(--text-primary)", margin:0 }}>{kpi.value}</p>
           </div>
         ))}
       </div>
@@ -270,13 +250,11 @@ function PurchaseModal({ onClose, t }) {
     setError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-
       if (!session?.access_token) {
         setError("Sessione scaduta. Effettua di nuovo il login.");
         setLoading(false);
         return;
       }
-
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`,
         {
@@ -292,16 +270,14 @@ function PurchaseModal({ onClose, t }) {
           }),
         }
       );
-
       const data = await res.json();
-
       if (data.url) {
         window.location.href = data.url;
       } else {
         setError(data.error || t("error_generic"));
         setLoading(false);
       }
-    } catch (err) {
+    } catch {
       setError(t("error_generic"));
       setLoading(false);
     }
@@ -311,103 +287,57 @@ function PurchaseModal({ onClose, t }) {
     <div className="overlay" onClick={onClose}>
       <div className="bottom-sheet" onClick={e => e.stopPropagation()}>
         <div className="sheet-handle" />
-        <h2
-          className="text-xl font-bold mb-1"
-          style={{ color: "var(--text-primary)" }}
-        >
+        <h2 style={{ fontSize:20, fontWeight:700, margin:"0 0 4px", color:"var(--text-primary)" }}>
           {t("new_event_title")}
         </h2>
-        <p className="text-sm mb-5" style={{ color: "var(--text-secondary)" }}>
+        <p style={{ fontSize:14, color:"var(--text-secondary)", margin:"0 0 20px" }}>
           {t("new_event_sub")}
         </p>
 
         {/* Riepilogo prezzo */}
-        <div className="card-secondary mb-5">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              {t("access_event")}
-            </span>
-            <span
-              className="text-sm font-medium"
-              style={{ color: "var(--text-primary)" }}
-            >
-              €2,99
-            </span>
+        <div style={{ background:"var(--bg-secondary)", borderRadius:14, padding:"14px 16px", marginBottom:20 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+            <span style={{ fontSize:14, color:"var(--text-secondary)" }}>{t("access_event")}</span>
+            <span style={{ fontSize:14, fontWeight:500, color:"var(--text-primary)" }}>€2,99</span>
           </div>
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              {t("vat_included")}
-            </span>
-            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              —
-            </span>
-          </div>
-          <div
-            className="flex justify-between items-center pt-3"
-            style={{ borderTop: "1px solid var(--border)" }}
-          >
-            <span
-              className="font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {t("total_label")}
-            </span>
-            <span
-              className="text-2xl font-bold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              €2,99
-            </span>
+          <div style={{ borderTop:"1px solid var(--border)", paddingTop:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <span style={{ fontSize:15, fontWeight:600, color:"var(--text-primary)" }}>{t("total_label")}</span>
+            <span style={{ fontSize:24, fontWeight:700, color:"var(--text-primary)" }}>€2,99</span>
           </div>
         </div>
 
-        {/* Feature list */}
-        <ul className="space-y-2 mb-5">
+        {/* Features */}
+        <ul style={{ margin:"0 0 20px", padding:0, listStyle:"none" }}>
           {features.map(f => (
-            <li
-              key={f}
-              className="flex items-center gap-2 text-sm"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <span style={{ color: "var(--success)", fontWeight: 600 }}>✓</span>
-              {f}
+            <li key={f} style={{ display:"flex", gap:8, fontSize:13, color:"var(--text-secondary)", marginBottom:8 }}>
+              <span style={{ color:"var(--success)", fontWeight:700 }}>✓</span> {f}
             </li>
           ))}
         </ul>
 
         {error && (
-          <div
-            className="rounded-lg p-3 mb-4 text-sm"
-            style={{
-              background: "var(--danger-light)",
-              color: "var(--danger-text)",
-            }}
-          >
+          <div style={{ background:"var(--danger-light)", color:"var(--danger-text)", borderRadius:10, padding:"10px 14px", fontSize:13, marginBottom:12 }}>
             {error}
           </div>
         )}
 
         <button
-          className="btn-primary w-full mb-3 py-3 text-base"
+          className="btn-primary"
+          style={{ width:"100%", justifyContent:"center", padding:"13px", fontSize:15, borderRadius:12, marginBottom:10, opacity: loading ? 0.7 : 1 }}
           onClick={handleCheckout}
           disabled={loading}
-          style={{ cursor: loading ? "not-allowed" : "pointer" }}
         >
-          {loading
-            ? "Reindirizzamento..."
-            : `🔒 ${t("proceed_payment")} · €2,99`}
+          {loading ? "Reindirizzamento..." : `🔒 ${t("proceed_payment")} · €2,99`}
         </button>
         <button
-          className="btn-secondary w-full py-2.5"
+          className="btn-secondary"
+          style={{ width:"100%", padding:"11px", fontSize:14, borderRadius:12 }}
           onClick={onClose}
           disabled={loading}
         >
           {t("cancel")}
         </button>
-        <p
-          className="text-center text-xs mt-3"
-          style={{ color: "var(--text-tertiary)" }}
-        >
+        <p style={{ textAlign:"center", fontSize:12, color:"var(--text-tertiary)", marginTop:12 }}>
           {t("secure_stripe")}
         </p>
       </div>
