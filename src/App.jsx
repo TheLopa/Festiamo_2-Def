@@ -7,6 +7,7 @@ import EventsList      from "./pages/EventsList";
 import PurchaseSuccess from "./pages/PurchaseSuccess";
 import Settings        from "./pages/Settings";
 import AppLayout       from "./layouts/AppLayout";
+import EventDashboard from "./pages/EventDashboard";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
