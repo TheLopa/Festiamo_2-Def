@@ -5,22 +5,22 @@ import Login           from "./pages/Login";
 import Register        from "./pages/Register";
 import EventsList      from "./pages/EventsList";
 import PurchaseSuccess from "./pages/PurchaseSuccess";
+import EventDashboard  from "./pages/EventDashboard";
 import Settings        from "./pages/Settings";
+import Budget          from "./pages/Budget";
+import Roadmap         from "./pages/Roadmap";
+import Guests          from "./pages/Guests";
+import Attendance      from "./pages/Attendance";
+import Scenarios       from "./pages/Scenarios";
+import SurveyDashboard from "./pages/SurveyDashboard";
+import SurveyForm      from "./pages/SurveyForm";
 import AppLayout       from "./layouts/AppLayout";
-import EventDashboard from "./pages/EventDashboard";
-import Budget from "./pages/Budget";
-import Roadmap from "./pages/Roadmap";
-import Guests from "./pages/Guests";
-import Attendance from "./pages/Attendance";
-import Scenarios from "./pages/Scenarios";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
   const { t } = useLang();
   if (loading) return (
-    <div style={{ padding: "2rem", color: "var(--text-primary)" }}>
-      {t("loading")}
-    </div>
+    <div style={{ padding: "2rem", color: "var(--text-primary)" }}>{t("loading")}</div>
   );
   return user ? children : <Navigate to="/login" replace />;
 }
@@ -34,24 +34,23 @@ function PublicRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      {/* Pubbliche */}
       <Route path="/login"             element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register"          element={<PublicRoute><Register /></PublicRoute>} />
       <Route path="/acquisto/successo" element={<PrivateRoute><PurchaseSuccess /></PrivateRoute>} />
+      <Route path="/survey/:eventId"   element={<SurveyForm />} />
 
-      {/* Protette con AppLayout */}
-    <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
-      <Route path="/eventi"                       element={<EventsList />} />
-      <Route path="/eventi/:eventId"              element={<EventDashboard />} />
-      <Route path="/eventi/:eventId/impostazioni" element={<Settings />} />
-      <Route path="/eventi/:eventId/budget" element={<Budget />} />
-      <Route path="/eventi/:eventId/roadmap" element={<Roadmap />} />
-      <Route path="/eventi/:eventId/invitati" element={<Guests />} />
-      <Route path="/eventi/:eventId/presenze" element={<Attendance />} />
-      <Route path="/eventi/:eventId/scenari" element={<Scenarios />} />
-    </Route>
+      <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
+        <Route path="/eventi"                           element={<EventsList />} />
+        <Route path="/eventi/:eventId"                  element={<EventDashboard />} />
+        <Route path="/eventi/:eventId/budget"           element={<Budget />} />
+        <Route path="/eventi/:eventId/roadmap"          element={<Roadmap />} />
+        <Route path="/eventi/:eventId/invitati"         element={<Guests />} />
+        <Route path="/eventi/:eventId/presenze"         element={<Attendance />} />
+        <Route path="/eventi/:eventId/scenari"          element={<Scenarios />} />
+        <Route path="/eventi/:eventId/survey"           element={<SurveyDashboard />} />
+        <Route path="/eventi/:eventId/impostazioni"     element={<Settings />} />
+      </Route>
 
-      {/* Fallback */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
