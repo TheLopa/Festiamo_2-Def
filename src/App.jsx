@@ -8,6 +8,7 @@ import PurchaseSuccess from "./pages/PurchaseSuccess";
 import Settings        from "./pages/Settings";
 import AppLayout       from "./layouts/AppLayout";
 import EventDashboard from "./pages/EventDashboard";
+import Budget from "./pages/Budget";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -39,6 +40,7 @@ export default function App() {
       <Route path="/eventi"                       element={<EventsList />} />
       <Route path="/eventi/:eventId"              element={<EventDashboard />} />
       <Route path="/eventi/:eventId/impostazioni" element={<Settings />} />
+      <Route path="/eventi/:eventId/budget" element={<Budget />} />
     </Route>
 
       {/* Fallback */}
