@@ -1,30 +1,41 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useLang } from "./context/LangContext";
+
+// Pagine pubbliche
+import Landing         from "./pages/Landing";
 import Login           from "./pages/Login";
 import Register        from "./pages/Register";
-import EventsList      from "./pages/EventsList";
+import SurveyForm      from "./pages/SurveyForm";
 import PurchaseSuccess from "./pages/PurchaseSuccess";
+
+// Pagine protette
+import EventsList      from "./pages/EventsList";
 import EventDashboard  from "./pages/EventDashboard";
-import Settings        from "./pages/Settings";
 import Budget          from "./pages/Budget";
 import Roadmap         from "./pages/Roadmap";
 import Guests          from "./pages/Guests";
 import Attendance      from "./pages/Attendance";
 import Scenarios       from "./pages/Scenarios";
 import SurveyDashboard from "./pages/SurveyDashboard";
-import SurveyForm      from "./pages/SurveyForm";
-import AppLayout       from "./layouts/AppLayout";
+import Settings        from "./pages/Settings";
 
+// Layout
+import AppLayout from "./layouts/AppLayout";
+
+// ── Route privata: se non loggato → /login ───────────────────
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
   const { t } = useLang();
   if (loading) return (
-    <div style={{ padding: "2rem", color: "var(--text-primary)" }}>{t("loading")}</div>
+    <div style={{ padding: "2rem", color: "var(--text-primary)" }}>
+      {t("loading")}
+    </div>
   );
   return user ? children : <Navigate to="/login" replace />;
 }
 
+// ── Route pubblica: se già loggato → /eventi ─────────────────
 function PublicRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
@@ -34,11 +45,20 @@ function PublicRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/login"             element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/register"          element={<PublicRoute><Register /></PublicRoute>} />
-      <Route path="/acquisto/successo" element={<PrivateRoute><PurchaseSuccess /></PrivateRoute>} />
-      <Route path="/survey/:eventId"   element={<SurveyForm />} />
+      {/* ── Landing (sempre visibile) ─────────────────────── */}
+      <Route path="/" element={<Landing />} />
 
+      {/* ── Auth (solo se non loggati) ────────────────────── */}
+      <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+
+      {/* ── Survey pubblica (senza login) ─────────────────── */}
+      <Route path="/survey/:eventId" element={<SurveyForm />} />
+
+      {/* ── Post-pagamento ────────────────────────────────── */}
+      <Route path="/acquisto/successo" element={<PrivateRoute><PurchaseSuccess /></PrivateRoute>} />
+
+      {/* ── App protetta con AppLayout ────────────────────── */}
       <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
         <Route path="/eventi"                           element={<EventsList />} />
         <Route path="/eventi/:eventId"                  element={<EventDashboard />} />
@@ -51,7 +71,8 @@ export default function App() {
         <Route path="/eventi/:eventId/impostazioni"     element={<Settings />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* ── Fallback ──────────────────────────────────────── */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
