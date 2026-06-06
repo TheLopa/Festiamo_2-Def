@@ -15,12 +15,33 @@ const PRESETS = {
   altro:      { label: "Altro",               emoji: "🎉" },
 };
 
+async function fetchEventKpi(eventId) {
+  const [budgetRes, roadmapRes, guestsRes] = await Promise.all([
+    supabase.from("budget_categories").select("budget_items(unit_cost,actual_spend)").eq("event_id", eventId),
+    supabase.from("roadmap_groups").select("roadmap_tasks(status)").eq("event_id", eventId),
+    supabase.from("guests").select("confirmation").eq("event_id", eventId).eq("is_walkin", false),
+  ]);
+  const items     = (budgetRes.data || []).flatMap(c => c.budget_items || []);
+  const budgetReal = items.reduce((s, i) => s + (parseFloat(i.actual_spend) || 0), 0);
+  const tasks      = (roadmapRes.data || []).flatMap(g => g.roadmap_tasks || []);
+  const taskDone   = tasks.filter(t => t.status === "done").length;
+  const taskTotal  = tasks.length;
+  const guests     = guestsRes.data || [];
+  const confirmed  = guests.filter(g => g.confirmation === "yes").length;
+  return {
+    budget:    `€${Math.round(budgetReal).toLocaleString("it-IT")}`,
+    roadmap:   `${taskDone}/${taskTotal}`,
+    confirmed: `${confirmed}`,
+  };
+}
+
 export default function EventsList() {
   const { user, profile, signOut } = useAuth();
   const { t } = useLang();
   const navigate = useNavigate();
 
   const [events, setEvents]       = useState([]);
+  const [kpis, setKpis]           = useState({});
   const [loading, setLoading]     = useState(true);
   const [showModal, setShowModal] = useState(false);
 
@@ -31,16 +52,24 @@ export default function EventsList() {
       .from("events")
       .select("*")
       .order("event_date", { ascending: true });
-    if (!error) setEvents(data || []);
+    if (!error && data) {
+      setEvents(data);
+      // Carica KPI per ogni evento in parallelo
+      const kpiResults = await Promise.all(
+        data.map(ev => fetchEventKpi(ev.id).then(kpi => ({ id: ev.id, kpi })))
+      );
+      const kpiMap = {};
+      kpiResults.forEach(({ id, kpi }) => { kpiMap[id] = kpi; });
+      setKpis(kpiMap);
+    }
     setLoading(false);
   }
 
-  const active = events.filter(e => e.paid && e.event_date && new Date(e.event_date) >= new Date());
-  const past   = events.filter(e => e.paid && e.event_date && new Date(e.event_date) < new Date());
-  const drafts = events.filter(e => !e.paid);
-  const noDate = events.filter(e => e.paid && !e.event_date);
+  const active  = events.filter(e => e.paid && e.event_date && new Date(e.event_date) >= new Date());
+  const past    = events.filter(e => e.paid && e.event_date && new Date(e.event_date) < new Date());
+  const drafts  = events.filter(e => !e.paid);
+  const noDate  = events.filter(e => e.paid && !e.event_date);
 
-  // Nome utente — prende il first name dal profilo o dalla email
   const firstName = profile?.full_name?.trim().split(" ")[0]
     || user?.user_metadata?.full_name?.split(" ")[0]
     || user?.email?.split("@")[0]
@@ -66,22 +95,15 @@ export default function EventsList() {
             {active.length} {t("events_active")} · {past.length} {t("events_done")}
           </p>
         </div>
-        <button
-          onClick={signOut}
-          style={{ background:"none", border:"none", cursor:"pointer", fontSize:13, color:"var(--text-tertiary)", padding:"4px 8px" }}
-        >
+        <button onClick={signOut}
+          style={{ background:"none", border:"none", cursor:"pointer", fontSize:13, color:"var(--text-tertiary)", padding:"4px 8px" }}>
           {t("logout")}
         </button>
       </div>
 
       {/* Empty state */}
       {events.length === 0 && (
-        <div style={{
-          textAlign:"center", padding:"48px 16px",
-          border:"1px dashed var(--border-strong)",
-          borderRadius:16,
-          marginBottom:16,
-        }}>
+        <div style={{ textAlign:"center", padding:"48px 16px", border:"1.5px dashed var(--border-strong)", borderRadius:16, marginBottom:16 }}>
           <div style={{ fontSize:40, marginBottom:12 }}>🎉</div>
           <p style={{ fontSize:16, fontWeight:600, color:"var(--text-primary)", margin:"0 0 6px" }}>{t("no_events")}</p>
           <p style={{ fontSize:14, color:"var(--text-secondary)", margin:"0 0 20px" }}>{t("no_events_sub")}</p>
@@ -95,15 +117,15 @@ export default function EventsList() {
       {active.length > 0 && (
         <>
           <p className="section-label">{t("section_ongoing")}</p>
-          {active.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
+          {active.map(ev => <EventCard key={ev.id} event={ev} kpi={kpis[ev.id]} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
         </>
       )}
 
-      {/* Senza data */}
+      {/* Da configurare */}
       {noDate.length > 0 && (
         <>
           <p className="section-label" style={{ marginTop:20 }}>Da configurare</p>
-          {noDate.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
+          {noDate.map(ev => <EventCard key={ev.id} event={ev} kpi={kpis[ev.id]} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
         </>
       )}
 
@@ -111,7 +133,7 @@ export default function EventsList() {
       {drafts.length > 0 && (
         <>
           <p className="section-label" style={{ marginTop:20 }}>{t("status_draft")}</p>
-          {drafts.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
+          {drafts.map(ev => <EventCard key={ev.id} event={ev} kpi={kpis[ev.id]} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
         </>
       )}
 
@@ -119,80 +141,66 @@ export default function EventsList() {
       {past.length > 0 && (
         <>
           <p className="section-label" style={{ marginTop:20 }}>{t("section_past")}</p>
-          {past.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
+          {past.map(ev => <EventCard key={ev.id} event={ev} kpi={kpis[ev.id]} onClick={() => navigate(`/eventi/${ev.id}`)} t={t} />)}
         </>
       )}
 
       {/* Bottone nuovo evento */}
       {events.length > 0 && (
-        <button
-          onClick={() => setShowModal(true)}
-          style={{
-            width:"100%", marginTop:12, padding:"14px",
-            borderRadius:14, fontSize:14, fontWeight:500,
-            border:"1.5px dashed var(--border-strong)",
-            color:"var(--text-secondary)", background:"none",
-            cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6,
-          }}
-        >
+        <button onClick={() => setShowModal(true)}
+          style={{ width:"100%", marginTop:12, padding:"14px", borderRadius:14, fontSize:14, fontWeight:500,
+            border:"1.5px dashed var(--border-strong)", color:"var(--text-secondary)", background:"none",
+            cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
           <Plus size={16} /> {t("new_event")}
         </button>
       )}
 
-      {/* Modal acquisto */}
       {showModal && <PurchaseModal onClose={() => setShowModal(false)} t={t} />}
     </div>
   );
 }
 
 // ── Card evento ──────────────────────────────────────────────
-function EventCard({ event, onClick, t }) {
-  const preset  = PRESETS[event.preset] || PRESETS.altro;
-  const isPast  = event.event_date && new Date(event.event_date) < new Date();
-  const noDate  = !event.event_date;
+function EventCard({ event, kpi, onClick, t }) {
+  const preset = PRESETS[event.preset] || PRESETS.altro;
+  const isPast = event.event_date && new Date(event.event_date) < new Date();
+  const noDate = !event.event_date;
 
   const statusLabel = !event.paid ? t("status_draft")
-    : isPast ? t("status_past")
     : noDate ? "Da configurare"
+    : isPast ? t("status_past")
     : t("status_active");
 
   const statusStyle = !event.paid
     ? { background:"var(--warning-light)", color:"var(--warning-text)" }
-    : isPast
-    ? { background:"var(--bg-tertiary)", color:"var(--text-tertiary)" }
     : noDate
     ? { background:"var(--warning-light)", color:"var(--warning-text)" }
+    : isPast
+    ? { background:"var(--bg-tertiary)", color:"var(--text-tertiary)" }
     : { background:"var(--success-light)", color:"var(--success-text)" };
 
   const dateStr = event.event_date
     ? new Date(event.event_date).toLocaleDateString("it-IT", { day:"2-digit", month:"short", year:"numeric" })
     : "Data non impostata";
 
+  const kpiItems = [
+    { label: t("kpi_budget"),    value: kpi?.budget    ?? "—" },
+    { label: t("kpi_confirmed"), value: kpi?.confirmed ?? "—" },
+    { label: t("kpi_roadmap"),   value: kpi?.roadmap   ?? "—" },
+  ];
+
   return (
-    <div
-      onClick={onClick}
-      style={{
-        background:"var(--bg-primary)",
-        border:"1px solid var(--border)",
-        borderRadius:16,
-        marginBottom:10,
-        cursor:"pointer",
-        overflow:"hidden",
-      }}
-    >
-      {/* Header card */}
+    <div onClick={onClick}
+      style={{ background:"var(--bg-primary)", border:"1px solid var(--border)", borderRadius:16, marginBottom:10, cursor:"pointer", overflow:"hidden" }}>
       <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 14px 10px" }}>
-        <div style={{
-          width:44, height:44, borderRadius:12,
-          background:"var(--bg-secondary)",
-          display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize:22, flexShrink:0,
-        }}>
+        <div style={{ width:44, height:44, borderRadius:12, background:"var(--bg-secondary)",
+          display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>
           {preset.emoji}
         </div>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-            <p style={{ fontSize:15, fontWeight:600, color:"var(--text-primary)", margin:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+            <p style={{ fontSize:15, fontWeight:600, color:"var(--text-primary)", margin:0,
+              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
               {event.name}
             </p>
             <span style={{ ...statusStyle, fontSize:11, padding:"2px 8px", borderRadius:20, flexShrink:0, fontWeight:500 }}>
@@ -207,21 +215,11 @@ function EventCard({ event, onClick, t }) {
       </div>
 
       {/* KPI */}
-      <div style={{
-        display:"grid", gridTemplateColumns:"repeat(3,1fr)",
-        borderTop:"1px solid var(--border)",
-      }}>
-        {[
-          { label: t("kpi_budget"),    value: "€0"  },
-          { label: t("kpi_confirmed"), value: "0"   },
-          { label: t("kpi_roadmap"),   value: "0/0" },
-        ].map((kpi, i) => (
-          <div key={i} style={{
-            padding:"10px 8px",
-            textAlign:"center",
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", borderTop:"1px solid var(--border)" }}>
+        {kpiItems.map((kpi, i) => (
+          <div key={i} style={{ padding:"10px 8px", textAlign:"center",
             borderRight: i < 2 ? "1px solid var(--border)" : "none",
-            background:"var(--bg-secondary)",
-          }}>
+            background:"var(--bg-secondary)" }}>
             <p style={{ fontSize:11, color:"var(--text-tertiary)", margin:"0 0 2px" }}>{kpi.label}</p>
             <p style={{ fontSize:14, fontWeight:600, color:"var(--text-primary)", margin:0 }}>{kpi.value}</p>
           </div>
@@ -293,8 +291,6 @@ function PurchaseModal({ onClose, t }) {
         <p style={{ fontSize:14, color:"var(--text-secondary)", margin:"0 0 20px" }}>
           {t("new_event_sub")}
         </p>
-
-        {/* Riepilogo prezzo */}
         <div style={{ background:"var(--bg-secondary)", borderRadius:14, padding:"14px 16px", marginBottom:20 }}>
           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
             <span style={{ fontSize:14, color:"var(--text-secondary)" }}>{t("access_event")}</span>
@@ -305,8 +301,6 @@ function PurchaseModal({ onClose, t }) {
             <span style={{ fontSize:24, fontWeight:700, color:"var(--text-primary)" }}>€2,99</span>
           </div>
         </div>
-
-        {/* Features */}
         <ul style={{ margin:"0 0 20px", padding:0, listStyle:"none" }}>
           {features.map(f => (
             <li key={f} style={{ display:"flex", gap:8, fontSize:13, color:"var(--text-secondary)", marginBottom:8 }}>
@@ -314,27 +308,19 @@ function PurchaseModal({ onClose, t }) {
             </li>
           ))}
         </ul>
-
         {error && (
           <div style={{ background:"var(--danger-light)", color:"var(--danger-text)", borderRadius:10, padding:"10px 14px", fontSize:13, marginBottom:12 }}>
             {error}
           </div>
         )}
-
-        <button
-          className="btn-primary"
+        <button className="btn-primary"
           style={{ width:"100%", justifyContent:"center", padding:"13px", fontSize:15, borderRadius:12, marginBottom:10, opacity: loading ? 0.7 : 1 }}
-          onClick={handleCheckout}
-          disabled={loading}
-        >
+          onClick={handleCheckout} disabled={loading}>
           {loading ? "Reindirizzamento..." : `🔒 ${t("proceed_payment")} · €2,99`}
         </button>
-        <button
-          className="btn-secondary"
+        <button className="btn-secondary"
           style={{ width:"100%", padding:"11px", fontSize:14, borderRadius:12 }}
-          onClick={onClose}
-          disabled={loading}
-        >
+          onClick={onClose} disabled={loading}>
           {t("cancel")}
         </button>
         <p style={{ textAlign:"center", fontSize:12, color:"var(--text-tertiary)", marginTop:12 }}>
