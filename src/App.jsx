@@ -1,9 +1,10 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useLang } from "./context/LangContext";
-import Login      from "./pages/Login";
-import Register   from "./pages/Register";
-import EventsList from "./pages/EventsList";
+import Login           from "./pages/Login";
+import Register        from "./pages/Register";
+import EventsList      from "./pages/EventsList";
+import PurchaseSuccess from "./pages/PurchaseSuccess";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -25,10 +26,11 @@ function PublicRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-      <Route path="/eventi"   element={<PrivateRoute><EventsList /></PrivateRoute>} />
-      <Route path="*"         element={<Navigate to="/login" replace />} />
+      <Route path="/login"             element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/register"          element={<PublicRoute><Register /></PublicRoute>} />
+      <Route path="/eventi"            element={<PrivateRoute><EventsList /></PrivateRoute>} />
+      <Route path="/acquisto/successo" element={<PrivateRoute><PurchaseSuccess /></PrivateRoute>} />
+      <Route path="*"                  element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
