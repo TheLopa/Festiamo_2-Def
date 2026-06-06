@@ -2,7 +2,7 @@ import { Outlet, useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLang } from "../context/LangContext";
 import {
-  Home, Settings, ChevronLeft, Sparkles,
+  Home, Settings, ChevronLeft,
   BarChart2, CheckSquare, Users, UserCheck,
   TrendingUp, ClipboardList
 } from "lucide-react";
@@ -60,7 +60,7 @@ export default function AppLayout() {
                 className="flex h-8 w-8 items-center justify-center rounded-xl"
                 style={{ background: "var(--brand)" }}
               >
-                <Sparkles size={16} color="#fff" />
+                <span style={{ fontSize: 16 }}>✨</span>
               </div>
               <span className="text-base font-bold" style={{ color: "var(--text-primary)" }}>
                 Festiamo
