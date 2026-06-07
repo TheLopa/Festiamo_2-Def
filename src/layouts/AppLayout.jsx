@@ -16,99 +16,170 @@ export default function AppLayout() {
 
   const isEventPage = !!eventId;
 
-  // Tab bar sezioni evento
   const eventTabs = [
-    { key: "budget",       label: t("budget"),     icon: BarChart2,    path: "budget"       },
-    { key: "roadmap",      label: t("roadmap"),     icon: CheckSquare,  path: "roadmap"      },
-    { key: "invitati",     label: t("guests"),      icon: Users,        path: "invitati"     },
-    { key: "presenze",     label: t("attendance"),  icon: UserCheck,    path: "presenze"     },
-    { key: "scenari",      label: t("scenarios"),   icon: TrendingUp,   path: "scenari"      },
-    { key: "survey",       label: t("survey"),      icon: ClipboardList, path: "survey"      },
-    { key: "impostazioni", label: t("settings"),    icon: Settings,     path: "impostazioni" },
+    { key: "panoramica",   label: t("overview"),    path: null            },
+    { key: "budget",       label: t("budget"),      path: "budget"        },
+    { key: "roadmap",      label: t("roadmap"),     path: "roadmap"       },
+    { key: "invitati",     label: t("guests"),      path: "invitati"      },
+    { key: "presenze",     label: t("attendance"),  path: "presenze"      },
+    { key: "scenari",      label: t("scenarios"),   path: "scenari"       },
+    { key: "survey",       label: t("survey"),      path: "survey"        },
+    { key: "impostazioni", label: t("settings"),    path: "impostazioni"  },
   ];
 
   function isActive(path) {
+    if (!path) return location.pathname === `/eventi/${eventId}`;
     return location.pathname.endsWith(`/${path}`);
   }
 
-  function isOverview() {
-    return location.pathname === `/eventi/${eventId}`;
-  }
+  // Preset dell'evento per mostrare emoji (opzionale, solo se disponibile)
+  // Se non vuoi passare i dati evento all'AppLayout lascia solo il titolo
+  // dalla location state o dal DOM — per ora usiamo solo il path
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
-      {/* ── HEADER ─────────────────────────────────────── */}
-      <header
-        className="sticky top-0 z-40 backdrop-blur-xl"
-        style={{
-          background: "color-mix(in srgb, var(--bg-primary) 80%, transparent)",
-          borderBottom: "1px solid var(--border)",
-        }}
-      >
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          {isEventPage ? (
-            <button
-              className="btn-ghost"
-              onClick={() => navigate("/eventi")}
-              aria-label={t("nav_back")}
-            >
-              <ChevronLeft size={20} />
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-xl"
-                style={{ background: "var(--brand)" }}
-              >
-                <span style={{ fontSize: 16 }}>✨</span>
-              </div>
-              <span className="text-base font-bold" style={{ color: "var(--text-primary)" }}>
-                Festiamo
-              </span>
-            </div>
-          )}
+    <div style={{ minHeight:"100vh", background:"var(--bg-primary)", display:"flex", flexDirection:"column" }}>
 
-          <div className="flex items-center gap-2">
-            {!isEventPage && (
+      {/* ── HEADER ── */}
+      <header style={{
+        position:"sticky", top:0, zIndex:40,
+        background:"color-mix(in srgb, var(--bg-primary) 85%, transparent)",
+        backdropFilter:"blur(16px)",
+        WebkitBackdropFilter:"blur(16px)",
+        borderBottom:"1px solid var(--border)",
+      }}>
+        <div style={{
+          maxWidth:672, margin:"0 auto",
+          padding: isEventPage ? "10px 16px 0" : "10px 16px",
+        }}>
+
+          {isEventPage ? (
+            /* ── Navbar evento ── */
+            <div style={{ display:"flex", alignItems:"center", gap:8, paddingBottom:8 }}>
+              {/* Back */}
               <button
-                className="btn-ghost"
-                onClick={() => navigate("/eventi/impostazioni-profilo")}
-                aria-label={t("nav_settings")}
+                onClick={() => navigate("/eventi")}
+                style={{
+                  background:"none", border:"none", cursor:"pointer",
+                  padding:"6px 6px 6px 2px", marginLeft:-4,
+                  borderRadius:10, color:"var(--text-tertiary)",
+                  display:"flex", alignItems:"center",
+                  WebkitTapHighlightColor:"transparent",
+                }}
+              >
+                <ChevronLeft size={22} />
+              </button>
+
+              {/* Titolo + data */}
+              <div style={{ flex:1, minWidth:0 }}>
+                <h1 style={{
+                  margin:0, fontSize:17, fontWeight:700, lineHeight:1.2,
+                  color:"var(--text-primary)",
+                  overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                }}>
+                  {/* Il nome evento viene mostrato dall'EventDashboard nel contenuto,
+                      qui mettiamo un placeholder generico che puoi sostituire
+                      passando il nome via context o location.state */}
+                  Evento
+                </h1>
+                <p style={{
+                  margin:0, fontSize:12, color:"var(--text-tertiary)", lineHeight:1.2, marginTop:1,
+                }}>
+                  &nbsp;
+                </p>
+              </div>
+
+              {/* Settings */}
+              <button
+                onClick={() => navigate(`/eventi/${eventId}/impostazioni`)}
+                style={{
+                  background:"none", border:"none", cursor:"pointer",
+                  padding:6, borderRadius:10, color:"var(--text-tertiary)",
+                  display:"flex", alignItems:"center",
+                  WebkitTapHighlightColor:"transparent",
+                }}
               >
                 <Settings size={20} />
               </button>
-            )}
-          </div>
-        </div>
-
-        {/* Tab bar sezioni evento */}
-        {isEventPage && (
-          <div className="tab-bar px-4 max-w-2xl mx-auto">
-            <button
-              className={`tab-item ${isOverview() ? "active" : ""}`}
-              onClick={() => navigate(`/eventi/${eventId}`)}
-            >
-              {t("overview")}
-            </button>
-            {eventTabs.map((tab) => (
+            </div>
+          ) : (
+            /* ── Navbar lista eventi ── */
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", paddingBottom:10 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <div style={{
+                  width:32, height:32, borderRadius:10,
+                  background:"var(--brand)",
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:16,
+                }}>
+                  ✨
+                </div>
+                <span style={{ fontSize:16, fontWeight:700, color:"var(--text-primary)" }}>
+                  Festiamo
+                </span>
+              </div>
               <button
-                key={tab.key}
-                className={`tab-item ${isActive(tab.path) ? "active" : ""}`}
-                onClick={() => navigate(`/eventi/${eventId}/${tab.path}`)}
+                onClick={() => navigate("/eventi/impostazioni-profilo")}
+                style={{
+                  background:"none", border:"none", cursor:"pointer",
+                  padding:6, borderRadius:10, color:"var(--text-tertiary)",
+                  display:"flex", alignItems:"center",
+                  WebkitTapHighlightColor:"transparent",
+                }}
               >
-                {tab.label}
+                <Settings size={20} />
               </button>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
+
+          {/* ── Tab bar evento (scrollabile) ── */}
+          {isEventPage && (
+            <div style={{
+              display:"flex", overflowX:"auto", scrollbarWidth:"none",
+              gap:0, marginLeft:-16, marginRight:-16, paddingLeft:16, paddingRight:16,
+            }}>
+              {eventTabs.map(tab => {
+                const active = isActive(tab.path);
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() =>
+                      tab.path === null
+                        ? navigate(`/eventi/${eventId}`)
+                        : navigate(`/eventi/${eventId}/${tab.path}`)
+                    }
+                    style={{
+                      flexShrink:0,
+                      background:"none", border:"none", cursor:"pointer",
+                      padding:"8px 12px",
+                      fontSize:13, fontWeight: active ? 600 : 400,
+                      whiteSpace:"nowrap",
+                      color: active ? "var(--brand)" : "var(--text-tertiary)",
+                      borderBottom: active
+                        ? "2px solid var(--brand)"
+                        : "2px solid transparent",
+                      transition:"color 0.15s, border-color 0.15s",
+                      WebkitTapHighlightColor:"transparent",
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </header>
 
-      {/* ── CONTENUTO ──────────────────────────────────── */}
-      <main className="mx-auto max-w-2xl px-4 py-6 pb-24">
+      {/* ── CONTENUTO ── */}
+      <main style={{
+        flex:1,
+        maxWidth:672, margin:"0 auto", width:"100%",
+        padding:"20px 16px 96px",
+      }}>
         <Outlet />
       </main>
 
-      {/* ── BOTTOM NAV (solo lista eventi) ─────────────── */}
+      {/* ── BOTTOM NAV (solo lista eventi) ── */}
       {!isEventPage && (
         <nav className="bottom-nav">
           <button
