@@ -6,15 +6,15 @@ import { Plus, Trash2, ChevronDown, ChevronUp, BarChart2, Info, X } from "lucide
 
 const DEFAULT_DRINKS = {
   alcolici: [
-    { name: "Vino",     perc: 40, drinksPerBot: 5,  price: 6  },
-    { name: "Birra",    perc: 35, drinksPerBot: 1,  price: 2  },
-    { name: "Prosecco", perc: 10, drinksPerBot: 6,  price: 8  },
-    { name: "Spirits",  perc: 15, drinksPerBot: 20, price: 15 },
+    { name: "Vino",     drinksPerPerson: 2, drinksPerBot: 5,  price: 8  },
+    { name: "Birra",    drinksPerPerson: 1, drinksPerBot: 1,  price: 2  },
+    { name: "Prosecco", drinksPerPerson: 1, drinksPerBot: 6,  price: 8  },
+    { name: "Spirits",  drinksPerPerson: 1, drinksPerBot: 20, price: 15 },
   ],
   analcoliche: [
-    { name: "Acqua",           perc: 50, drinksPerBot: 8, price: 1.5 },
-    { name: "Succhi e bibite", perc: 30, drinksPerBot: 6, price: 2   },
-    { name: "Soft drink",      perc: 20, drinksPerBot: 4, price: 2.5 },
+    { name: "Acqua",           drinksPerPerson: 3, drinksPerBot: 8, price: 1.5 },
+    { name: "Succhi e bibite", drinksPerPerson: 2, drinksPerBot: 6, price: 2   },
+    { name: "Soft drink",      drinksPerPerson: 1, drinksPerBot: 4, price: 2.5 },
   ],
 };
 
@@ -36,20 +36,18 @@ export default function Budget() {
   const [saving,     setSaving]     = useState(false);
   const [toastMsg,   setToastMsg]   = useState("");
   const [openCats,   setOpenCats]   = useState({});
-  const [addForms,   setAddForms]   = useState({});
-  const [newItems,   setNewItems]   = useState({});
   const [showDrinksInfo,    setShowDrinksInfo]    = useState(false);
   const [openDrinksSection, setOpenDrinksSection] = useState({ alc: true, analc: true });
-  // Modal aggiungi voce
-  const [modal, setModal] = useState(null); // { catId }
+  const [modal,     setModal]     = useState(null);
   const [modalForm, setModalForm] = useState({ label: "", prev: "", real: "" });
-  // Modal aggiungi bevanda
-  const [drinkModal, setDrinkModal] = useState(null); // { type }
-  const [drinkForm, setDrinkForm]   = useState({ name: "", perc: "10", drinksPerBot: "6", price: "5" });
+  const [drinkModal, setDrinkModal] = useState(null);
+  const [drinkForm,  setDrinkForm]  = useState({ name: "", drinksPerPerson: "1", drinksPerBot: "6", price: "5" });
+  const [catModal,   setCatModal]   = useState(false);
+  const [catName,    setCatName]    = useState("");
 
   useEffect(() => { fetchData(); }, [eventId]);
 
-  function showToast(msg = t("saved")) {
+  function showToast(msg = "Salvato") {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 2000);
   }
@@ -80,23 +78,27 @@ export default function Budget() {
         const items = bevCat.budget_items || [];
         const alc   = items.filter(i => i.formula_key === "alcolico").map(i => ({
           id: i.id, name: i.label,
-          perc: i.percentage || 0, drinksPerBot: i.drinks_per_bottle || 1, price: i.unit_cost || 0,
+          drinksPerPerson: i.drinks_per_person || 1,
+          drinksPerBot: i.drinks_per_bottle || 1,
+          price: i.unit_cost || 0,
         }));
         const analc = items.filter(i => i.formula_key === "analcolico").map(i => ({
           id: i.id, name: i.label,
-          perc: i.percentage || 0, drinksPerBot: i.drinks_per_bottle || 1, price: i.unit_cost || 0,
+          drinksPerPerson: i.drinks_per_person || 1,
+          drinksPerBot: i.drinks_per_bottle || 1,
+          price: i.unit_cost || 0,
         }));
         setDrinks({ catId: bevCat.id, alcolici: alc, analcoliche: analc });
       } else {
         await createDrinksCategory();
       }
     } else {
-      await createDefaultCategories(ev);
+      await createDefaultCategories();
     }
     setLoading(false);
   }
 
-  async function createDefaultCategories(ev) {
+  async function createDefaultCategories() {
     const names = ["Catering", "Musica", "Location", "Extra"];
     const { data: cats } = await supabase
       .from("budget_categories")
@@ -122,41 +124,45 @@ export default function Budget() {
       ...DEFAULT_DRINKS.alcolici.map(d => ({
         category_id: bevCat.id, event_id: eventId,
         label: d.name, kind: "formula", formula_key: "alcolico",
-        percentage: d.perc, drinks_per_bottle: d.drinksPerBot,
+        drinks_per_person: d.drinksPerPerson,
+        drinks_per_bottle: d.drinksPerBot,
         unit_cost: d.price, actual_spend: 0, is_variable: true,
       })),
       ...DEFAULT_DRINKS.analcoliche.map(d => ({
         category_id: bevCat.id, event_id: eventId,
         label: d.name, kind: "formula", formula_key: "analcolico",
-        percentage: d.perc, drinks_per_bottle: d.drinksPerBot,
+        drinks_per_person: d.drinksPerPerson,
+        drinks_per_bottle: d.drinksPerBot,
         unit_cost: d.price, actual_spend: 0, is_variable: true,
       })),
     ];
     const { data: createdItems } = await supabase.from("budget_items").insert(items).select();
     if (createdItems) {
       const alc   = createdItems.filter(i => i.formula_key === "alcolico").map(i => ({
-        id: i.id, name: i.label, perc: i.percentage, drinksPerBot: i.drinks_per_bottle, price: i.unit_cost,
+        id: i.id, name: i.label,
+        drinksPerPerson: i.drinks_per_person, drinksPerBot: i.drinks_per_bottle, price: i.unit_cost,
       }));
       const analc = createdItems.filter(i => i.formula_key === "analcolico").map(i => ({
-        id: i.id, name: i.label, perc: i.percentage, drinksPerBot: i.drinks_per_bottle, price: i.unit_cost,
+        id: i.id, name: i.label,
+        drinksPerPerson: i.drinks_per_person, drinksPerBot: i.drinks_per_bottle, price: i.unit_cost,
       }));
       setDrinks({ catId: bevCat.id, alcolici: alc, analcoliche: analc });
     }
   }
 
-  const ospiti       = event?.planned_guests   || 0;
-  const drinksXpers  = event?.drinks_per_person || 0;
+  const ospiti = event?.planned_guests || 0;
 
-  function calcBot(perc, drinksPerBot) {
-    return Math.ceil((ospiti * drinksXpers * (perc / 100)) / drinksPerBot);
+  // Nuova formula: ospiti × drinks_per_person (per bevanda) ÷ drinks_per_bottle × €/bottiglia
+  function calcBot(drinksPerPerson, drinksPerBot) {
+    return Math.ceil((ospiti * drinksPerPerson) / drinksPerBot);
   }
-  function calcCosto(perc, drinksPerBot, price) {
-    return calcBot(perc, drinksPerBot) * price;
+  function calcCosto(drinksPerPerson, drinksPerBot, price) {
+    return calcBot(drinksPerPerson, drinksPerBot) * price;
   }
 
   const totaleDrinks = drinks
     ? [...(drinks.alcolici || []), ...(drinks.analcoliche || [])].reduce(
-        (s, d) => s + calcCosto(d.perc, d.drinksPerBot, d.price), 0
+        (s, d) => s + calcCosto(d.drinksPerPerson, d.drinksPerBot, d.price), 0
       )
     : 0;
 
@@ -220,6 +226,22 @@ export default function Budget() {
     showToast();
   }
 
+  async function addCategory() {
+    const name = catName.trim();
+    if (!name) return;
+    const { data } = await supabase
+      .from("budget_categories")
+      .insert({ event_id: eventId, name, sort_order: categories.length })
+      .select().single();
+    if (data) {
+      setCategories(prev => [...prev, { ...data, budget_items: [] }]);
+      setOpenCats(prev => ({ ...prev, [data.id]: true }));
+    }
+    setCatModal(false);
+    setCatName("");
+    showToast("Categoria aggiunta");
+  }
+
   async function updateDrink(type, index, field, value) {
     const num = parseFloat(value) || 0;
     setDrinks(prev => {
@@ -229,8 +251,9 @@ export default function Budget() {
     });
     const drink = drinks[type][index];
     if (!drink?.id) return;
-    const dbField = field === "perc" ? "percentage"
-      : field === "drinksPerBot" ? "drinks_per_bottle" : "unit_cost";
+    const dbField = field === "drinksPerPerson" ? "drinks_per_person"
+      : field === "drinksPerBot" ? "drinks_per_bottle"
+      : "unit_cost";
     clearTimeout(window._drinkTimer);
     window._drinkTimer = setTimeout(async () => {
       setSaving(true);
@@ -253,15 +276,17 @@ export default function Budget() {
     const name = drinkForm.name?.trim();
     if (!name) return;
     const formulaKey = type === "alcolici" ? "alcolico" : "analcolico";
+    const drinksPerPerson = parseFloat(drinkForm.drinksPerPerson) || 1;
+    const drinksPerBot    = parseFloat(drinkForm.drinksPerBot)    || 6;
+    const price           = parseFloat(drinkForm.price)           || 5;
     const { data } = await supabase
       .from("budget_items")
       .insert({
         category_id: drinks.catId, event_id: eventId,
         label: name, kind: "formula", formula_key: formulaKey,
-        percentage: parseFloat(drinkForm.perc) || 10,
-        drinks_per_bottle: parseFloat(drinkForm.drinksPerBot) || 6,
-        unit_cost: parseFloat(drinkForm.price) || 5,
-        actual_spend: 0, is_variable: true,
+        drinks_per_person: drinksPerPerson,
+        drinks_per_bottle: drinksPerBot,
+        unit_cost: price, actual_spend: 0, is_variable: true,
       })
       .select().single();
     if (data) {
@@ -269,12 +294,12 @@ export default function Budget() {
         ...prev,
         [type]: [...prev[type], {
           id: data.id, name: data.label,
-          perc: data.percentage, drinksPerBot: data.drinks_per_bottle, price: data.unit_cost,
+          drinksPerPerson, drinksPerBot, price,
         }],
       }));
     }
     setDrinkModal(null);
-    setDrinkForm({ name: "", perc: "10", drinksPerBot: "6", price: "5" });
+    setDrinkForm({ name: "", drinksPerPerson: "1", drinksPerBot: "6", price: "5" });
     showToast();
   }
 
@@ -291,9 +316,6 @@ export default function Budget() {
     );
   }
 
-  const percSumAlc   = (drinks?.alcolici   || []).reduce((s, d) => s + (d.perc || 0), 0);
-  const percSumAnalc = (drinks?.analcoliche || []).reduce((s, d) => s + (d.perc || 0), 0);
-
   const cardStyle = {
     background:"var(--bg-secondary)",
     border:"1px solid var(--border)",
@@ -309,6 +331,19 @@ export default function Budget() {
     width:"100%", boxSizing:"border-box",
   };
 
+  const overlayStyle = {
+    position:"fixed", inset:0, zIndex:200,
+    background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)",
+    display:"flex", alignItems:"flex-end",
+  };
+
+  const sheetStyle = {
+    width:"100%", background:"var(--bg-secondary)",
+    borderRadius:"20px 20px 0 0", padding:"24px 20px 40px",
+    maxHeight:"85vh", overflowY:"auto",
+    boxSizing:"border-box",
+  };
+
   return (
     <div style={{ paddingBottom:32 }}>
 
@@ -318,7 +353,7 @@ export default function Budget() {
           position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)",
           background:"var(--success)", color:"#fff",
           padding:"8px 20px", borderRadius:20, fontSize:13, fontWeight:600,
-          zIndex:100, pointerEvents:"none",
+          zIndex:300, pointerEvents:"none", whiteSpace:"nowrap",
         }}>
           {toastMsg} ✓
         </div>
@@ -334,16 +369,14 @@ export default function Budget() {
           <BarChart2 size={20} style={{ color:"var(--success)" }} />
         </div>
         <div style={{ flex:1 }}>
-          <h1 style={{ margin:0, fontSize:17, fontWeight:700, color:"var(--text-primary)" }}>
-            {t("budget")}
-          </h1>
+          <h1 style={{ margin:0, fontSize:17, fontWeight:700, color:"var(--text-primary)" }}>Budget</h1>
           <p style={{ margin:0, fontSize:12, color:"var(--text-tertiary)" }}>
-            {saving ? "Salvataggio..." : t("autosave")}
+            {saving ? "Salvataggio..." : "Salvataggio automatico"}
           </p>
         </div>
       </div>
 
-      {/* Totali 3 card */}
+      {/* Totali */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:20 }}>
         <div style={{ ...cardStyle, marginBottom:0, padding:"14px 14px 12px" }}>
           <p style={{ margin:0, fontSize:11, color:"var(--text-tertiary)" }}>Preventivato</p>
@@ -366,12 +399,10 @@ export default function Budget() {
       {categories.map(cat => {
         const items   = cat.budget_items || [];
         const catPrev = items.reduce((s, i) => s + (parseFloat(i.unit_cost)    || 0), 0);
-        const catReal = items.reduce((s, i) => s + (parseFloat(i.actual_spend) || 0), 0);
         const isOpen  = openCats[cat.id] !== false;
 
         return (
           <div key={cat.id} style={cardStyle}>
-            {/* Header categoria */}
             <button
               onClick={() => setOpenCats(p => ({ ...p, [cat.id]: !isOpen }))}
               style={{
@@ -383,9 +414,7 @@ export default function Budget() {
             >
               <span style={{ fontSize:15, fontWeight:600, color:"var(--text-primary)" }}>{cat.name}</span>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:12, color:"var(--text-tertiary)" }}>
-                  {fmt(catPrev)} prev
-                </span>
+                <span style={{ fontSize:12, color:"var(--text-tertiary)" }}>{fmt(catPrev)} prev</span>
                 {isOpen
                   ? <ChevronUp size={16} style={{ color:"var(--text-tertiary)" }} />
                   : <ChevronDown size={16} style={{ color:"var(--text-tertiary)" }} />}
@@ -398,7 +427,6 @@ export default function Budget() {
                   const d = (parseFloat(item.actual_spend) || 0) - (parseFloat(item.unit_cost) || 0);
                   return (
                     <div key={item.id} style={{ padding:"12px 16px", borderBottom:"1px solid var(--border)" }}>
-                      {/* Nome + diff + elimina */}
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
                         <span style={{ fontSize:14, fontWeight:500, color:"var(--text-primary)", flex:1, marginRight:8 }}>
                           {item.label}
@@ -408,39 +436,28 @@ export default function Budget() {
                             color: d > 0 ? "var(--danger)" : d < 0 ? "var(--success)" : "var(--text-tertiary)" }}>
                             {fmtDiff(d)}
                           </span>
-                          <button
-                            onClick={() => deleteItem(item.id, cat.id)}
+                          <button onClick={() => deleteItem(item.id, cat.id)}
                             style={{ background:"none", border:"none", cursor:"pointer",
-                              padding:4, color:"var(--text-tertiary)", display:"flex" }}
-                          >
+                              padding:4, color:"var(--text-tertiary)", display:"flex" }}>
                             <Trash2 size={15} />
                           </button>
                         </div>
                       </div>
-                      {/* Input prev + reale affiancati */}
                       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
                         <div>
                           <p style={{ margin:"0 0 4px", fontSize:11, color:"var(--text-tertiary)" }}>Prev. €</p>
-                          <input
-                            type="number" style={inputStyle}
-                            value={item.unit_cost || ""} placeholder="0"
-                            onChange={e => updateItem(item.id, cat.id, "unit_cost", e.target.value)}
-                          />
+                          <input type="number" style={inputStyle} value={item.unit_cost || ""} placeholder="0"
+                            onChange={e => updateItem(item.id, cat.id, "unit_cost", e.target.value)} />
                         </div>
                         <div>
                           <p style={{ margin:"0 0 4px", fontSize:11, color:"var(--text-tertiary)" }}>Reale €</p>
-                          <input
-                            type="number" style={inputStyle}
-                            value={item.actual_spend || ""} placeholder="0"
-                            onChange={e => updateItem(item.id, cat.id, "actual_spend", e.target.value)}
-                          />
+                          <input type="number" style={inputStyle} value={item.actual_spend || ""} placeholder="0"
+                            onChange={e => updateItem(item.id, cat.id, "actual_spend", e.target.value)} />
                         </div>
                       </div>
                     </div>
                   );
                 })}
-
-                {/* Aggiungi voce */}
                 <button
                   onClick={() => { setModal({ catId: cat.id }); setModalForm({ label:"", prev:"", real:"" }); }}
                   style={{
@@ -458,10 +475,24 @@ export default function Budget() {
         );
       })}
 
-      {/* Sezione Bevande */}
+      {/* Bottone nuova categoria */}
+      <button
+        onClick={() => { setCatModal(true); setCatName(""); }}
+        style={{
+          width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+          padding:"13px 16px", marginBottom:12,
+          background:"none", border:"1px dashed var(--border)",
+          borderRadius:16, cursor:"pointer",
+          color:"var(--brand)", fontSize:14, fontWeight:500,
+          WebkitTapHighlightColor:"transparent",
+        }}
+      >
+        <Plus size={16} /> Nuova categoria
+      </button>
+
+      {/* Bevande */}
       {drinks && (
         <div style={cardStyle}>
-          {/* Header bevande */}
           <div style={{
             display:"flex", alignItems:"center", justifyContent:"space-between",
             padding:"13px 16px", borderBottom:"1px solid var(--border)",
@@ -469,27 +500,22 @@ export default function Budget() {
             <span style={{ fontSize:15, fontWeight:600, color:"var(--text-primary)" }}>🍷 Bevande</span>
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
               <span style={{ fontSize:12, color:"var(--text-tertiary)" }}>{fmt(totaleDrinks)} prev.</span>
-              <button
-                onClick={() => setShowDrinksInfo(p => !p)}
+              <button onClick={() => setShowDrinksInfo(p => !p)}
                 style={{ background:"none", border:"none", cursor:"pointer",
-                  color:"var(--text-tertiary)", display:"flex", padding:4 }}
-              >
+                  color:"var(--text-tertiary)", display:"flex", padding:4 }}>
                 <Info size={16} />
               </button>
             </div>
           </div>
 
-          {/* Info formula */}
           {showDrinksInfo && (
             <div style={{
-              padding:"12px 16px", fontSize:12,
+              padding:"12px 16px", fontSize:12, lineHeight:1.6,
               background:"var(--brand-light)", color:"var(--brand-text, var(--brand))",
-              borderBottom:"1px solid var(--border)", lineHeight:1.5,
+              borderBottom:"1px solid var(--border)",
             }}>
-              Formula: ospiti × drinks/pers × % ÷ drinks/bott × €/bott<br/>
-              Alcolici: <strong style={{ color: percSumAlc === 100 ? "var(--success)" : "var(--danger)" }}>{percSumAlc}%</strong>
-              {" · "}Analcoliche: <strong style={{ color: percSumAnalc === 100 ? "var(--success)" : "var(--danger)" }}>{percSumAnalc}%</strong>
-              <br/><span style={{ opacity:0.7 }}>Ogni gruppo deve sommare a 100%</span>
+              Formula per ogni bevanda:<br/>
+              <strong>ospiti ({ospiti}) × drink/pers ÷ drink/bott × €/bott</strong>
             </div>
           )}
 
@@ -504,18 +530,16 @@ export default function Budget() {
             }}
           >
             <span style={{ fontSize:13, fontWeight:500, color:"var(--text-secondary)" }}>🍺 Alcolici</span>
-            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-              <span style={{ fontSize:12, fontWeight:600,
-                color: percSumAlc === 100 ? "var(--success)" : "var(--danger)" }}>{percSumAlc}%</span>
-              {openDrinksSection.alc ? <ChevronUp size={14} style={{ color:"var(--text-tertiary)" }}/> : <ChevronDown size={14} style={{ color:"var(--text-tertiary)" }}/>}
-            </div>
+            {openDrinksSection.alc
+              ? <ChevronUp size={14} style={{ color:"var(--text-tertiary)" }}/>
+              : <ChevronDown size={14} style={{ color:"var(--text-tertiary)" }}/>}
           </button>
 
           {openDrinksSection.alc && (
             <div>
               {(drinks.alcolici || []).map((d, i) => {
-                const bot   = calcBot(d.perc, d.drinksPerBot);
-                const costo = calcCosto(d.perc, d.drinksPerBot, d.price);
+                const bot   = calcBot(d.drinksPerPerson, d.drinksPerBot);
+                const costo = calcCosto(d.drinksPerPerson, d.drinksPerBot, d.price);
                 return (
                   <div key={i} style={{ padding:"12px 16px", borderBottom:"1px solid var(--border)" }}>
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
@@ -530,17 +554,18 @@ export default function Budget() {
                       </div>
                     </div>
                     <p style={{ margin:"0 0 8px", fontSize:11, color:"var(--text-tertiary)" }}>
-                      {ospiti} osp × {drinksXpers} drinks × {d.perc}% ÷ {d.drinksPerBot} = <strong>{bot} bott.</strong> × €{d.price}
+                      {ospiti} osp × {d.drinksPerPerson} drink/pers ÷ {d.drinksPerBot} = <strong>{bot} bott.</strong> × €{d.price}
                     </p>
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
                       {[
-                        { label:"% drinks", field:"perc",        val:d.perc,        min:0, max:100, step:1 },
-                        { label:"Drinks/bott.", field:"drinksPerBot", val:d.drinksPerBot, min:1, step:1 },
-                        { label:"€/bott.",  field:"price",       val:d.price,       min:0, step:0.5 },
+                        { label:"Drink/pers.", field:"drinksPerPerson", val:d.drinksPerPerson, min:0.5, step:0.5 },
+                        { label:"Drink/bott.", field:"drinksPerBot",    val:d.drinksPerBot,    min:1,   step:1   },
+                        { label:"€/bott.",     field:"price",           val:d.price,           min:0,   step:0.5 },
                       ].map(({ label, field, val, ...rest }) => (
                         <div key={field}>
                           <p style={{ margin:"0 0 4px", fontSize:10, color:"var(--text-tertiary)" }}>{label}</p>
-                          <input type="number" style={{ ...inputStyle, fontSize:13, padding:"7px 8px" }}
+                          <input type="number"
+                            style={{ ...inputStyle, fontSize:13, padding:"7px 8px" }}
                             value={val} {...rest}
                             onChange={e => updateDrink("alcolici", i, field, e.target.value)} />
                         </div>
@@ -550,7 +575,7 @@ export default function Budget() {
                 );
               })}
               <button
-                onClick={() => { setDrinkModal({ type:"alcolici" }); setDrinkForm({ name:"", perc:"10", drinksPerBot:"6", price:"5" }); }}
+                onClick={() => { setDrinkModal({ type:"alcolici" }); setDrinkForm({ name:"", drinksPerPerson:"1", drinksPerBot:"6", price:"5" }); }}
                 style={{ width:"100%", display:"flex", alignItems:"center", gap:8,
                   padding:"11px 16px", background:"none", border:"none", cursor:"pointer",
                   color:"var(--brand)", fontSize:13, WebkitTapHighlightColor:"transparent" }}
@@ -571,18 +596,16 @@ export default function Budget() {
             }}
           >
             <span style={{ fontSize:13, fontWeight:500, color:"var(--text-secondary)" }}>🥤 Analcoliche</span>
-            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-              <span style={{ fontSize:12, fontWeight:600,
-                color: percSumAnalc === 100 ? "var(--success)" : "var(--danger)" }}>{percSumAnalc}%</span>
-              {openDrinksSection.analc ? <ChevronUp size={14} style={{ color:"var(--text-tertiary)" }}/> : <ChevronDown size={14} style={{ color:"var(--text-tertiary)" }}/>}
-            </div>
+            {openDrinksSection.analc
+              ? <ChevronUp size={14} style={{ color:"var(--text-tertiary)" }}/>
+              : <ChevronDown size={14} style={{ color:"var(--text-tertiary)" }}/>}
           </button>
 
           {openDrinksSection.analc && (
             <div>
               {(drinks.analcoliche || []).map((d, i) => {
-                const bot   = calcBot(d.perc, d.drinksPerBot);
-                const costo = calcCosto(d.perc, d.drinksPerBot, d.price);
+                const bot   = calcBot(d.drinksPerPerson, d.drinksPerBot);
+                const costo = calcCosto(d.drinksPerPerson, d.drinksPerBot, d.price);
                 return (
                   <div key={i} style={{ padding:"12px 16px", borderBottom:"1px solid var(--border)" }}>
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
@@ -597,17 +620,18 @@ export default function Budget() {
                       </div>
                     </div>
                     <p style={{ margin:"0 0 8px", fontSize:11, color:"var(--text-tertiary)" }}>
-                      {ospiti} osp × {drinksXpers} drinks × {d.perc}% ÷ {d.drinksPerBot} = <strong>{bot} bott.</strong> × €{d.price}
+                      {ospiti} osp × {d.drinksPerPerson} drink/pers ÷ {d.drinksPerBot} = <strong>{bot} bott.</strong> × €{d.price}
                     </p>
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
                       {[
-                        { label:"% drinks",    field:"perc",        val:d.perc,        min:0, max:100, step:1 },
-                        { label:"Drinks/bott.", field:"drinksPerBot", val:d.drinksPerBot, min:1, step:1 },
-                        { label:"€/bott.",     field:"price",       val:d.price,       min:0, step:0.5 },
+                        { label:"Drink/pers.", field:"drinksPerPerson", val:d.drinksPerPerson, min:0.5, step:0.5 },
+                        { label:"Drink/bott.", field:"drinksPerBot",    val:d.drinksPerBot,    min:1,   step:1   },
+                        { label:"€/bott.",     field:"price",           val:d.price,           min:0,   step:0.5 },
                       ].map(({ label, field, val, ...rest }) => (
                         <div key={field}>
                           <p style={{ margin:"0 0 4px", fontSize:10, color:"var(--text-tertiary)" }}>{label}</p>
-                          <input type="number" style={{ ...inputStyle, fontSize:13, padding:"7px 8px" }}
+                          <input type="number"
+                            style={{ ...inputStyle, fontSize:13, padding:"7px 8px" }}
                             value={val} {...rest}
                             onChange={e => updateDrink("analcoliche", i, field, e.target.value)} />
                         </div>
@@ -617,7 +641,7 @@ export default function Budget() {
                 );
               })}
               <button
-                onClick={() => { setDrinkModal({ type:"analcoliche" }); setDrinkForm({ name:"", perc:"10", drinksPerBot:"6", price:"5" }); }}
+                onClick={() => { setDrinkModal({ type:"analcoliche" }); setDrinkForm({ name:"", drinksPerPerson:"1", drinksPerBot:"6", price:"5" }); }}
                 style={{ width:"100%", display:"flex", alignItems:"center", gap:8,
                   padding:"11px 16px", background:"none", border:"none", cursor:"pointer",
                   color:"var(--brand)", fontSize:13, WebkitTapHighlightColor:"transparent" }}
@@ -629,19 +653,10 @@ export default function Budget() {
         </div>
       )}
 
-      {/* ── Modal aggiungi voce ── */}
+      {/* Modal aggiungi voce */}
       {modal && (
-        <div style={{
-          position:"fixed", inset:0, zIndex:200,
-          background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)",
-          display:"flex", alignItems:"flex-end",
-        }}
-          onClick={e => { if (e.target === e.currentTarget) setModal(null); }}
-        >
-          <div style={{
-            width:"100%", background:"var(--bg-secondary)",
-            borderRadius:"20px 20px 0 0", padding:"24px 20px 40px",
-          }}>
+        <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) setModal(null); }}>
+          <div style={sheetStyle}>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
               <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:"var(--text-primary)" }}>Aggiungi voce</h2>
               <button onClick={() => setModal(null)}
@@ -669,33 +684,21 @@ export default function Budget() {
                   onChange={e => setModalForm(p => ({ ...p, real: e.target.value }))} />
               </div>
             </div>
-            <button
-              onClick={addItem}
-              style={{
-                width:"100%", padding:"14px", borderRadius:14,
-                background:"var(--brand)", border:"none", cursor:"pointer",
-                color:"#fff", fontSize:15, fontWeight:700,
-              }}
-            >
+            <button onClick={addItem} style={{
+              width:"100%", padding:"14px", borderRadius:14,
+              background:"var(--brand)", border:"none", cursor:"pointer",
+              color:"#fff", fontSize:15, fontWeight:700,
+            }}>
               Aggiungi
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Modal aggiungi bevanda ── */}
+      {/* Modal aggiungi bevanda */}
       {drinkModal && (
-        <div style={{
-          position:"fixed", inset:0, zIndex:200,
-          background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)",
-          display:"flex", alignItems:"flex-end",
-        }}
-          onClick={e => { if (e.target === e.currentTarget) setDrinkModal(null); }}
-        >
-          <div style={{
-            width:"100%", background:"var(--bg-secondary)",
-            borderRadius:"20px 20px 0 0", padding:"24px 20px 40px",
-          }}>
+        <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) setDrinkModal(null); }}>
+          <div style={sheetStyle}>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
               <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:"var(--text-primary)" }}>
                 Aggiungi {drinkModal.type === "alcolici" ? "alcolico" : "analcolico"}
@@ -707,15 +710,15 @@ export default function Budget() {
             </div>
             <div style={{ marginBottom:12 }}>
               <p style={{ margin:"0 0 6px", fontSize:13, color:"var(--text-tertiary)" }}>Nome</p>
-              <input type="text" style={{ ...inputStyle, fontSize:15 }} placeholder="es. Aperol, Tè freddo..."
+              <input type="text" style={{ ...inputStyle, fontSize:15 }} placeholder="es. Negroni, Tè freddo..."
                 value={drinkForm.name} autoFocus
                 onChange={e => setDrinkForm(p => ({ ...p, name: e.target.value }))} />
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:20 }}>
               {[
-                { label:"% drinks", key:"perc",        placeholder:"10" },
-                { label:"Drinks/bott.", key:"drinksPerBot", placeholder:"6"  },
-                { label:"€/bott.",  key:"price",       placeholder:"5"  },
+                { label:"Drink/pers.", key:"drinksPerPerson", placeholder:"1"  },
+                { label:"Drink/bott.", key:"drinksPerBot",    placeholder:"6"  },
+                { label:"€/bott.",     key:"price",           placeholder:"5"  },
               ].map(({ label, key, placeholder }) => (
                 <div key={key}>
                   <p style={{ margin:"0 0 6px", fontSize:12, color:"var(--text-tertiary)" }}>{label}</p>
@@ -725,15 +728,40 @@ export default function Budget() {
                 </div>
               ))}
             </div>
-            <button
-              onClick={addDrink}
-              style={{
-                width:"100%", padding:"14px", borderRadius:14,
-                background:"var(--brand)", border:"none", cursor:"pointer",
-                color:"#fff", fontSize:15, fontWeight:700,
-              }}
-            >
+            <button onClick={addDrink} style={{
+              width:"100%", padding:"14px", borderRadius:14,
+              background:"var(--brand)", border:"none", cursor:"pointer",
+              color:"#fff", fontSize:15, fontWeight:700,
+            }}>
               Aggiungi
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Modal nuova categoria */}
+      {catModal && (
+        <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) setCatModal(false); }}>
+          <div style={sheetStyle}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+              <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:"var(--text-primary)" }}>Nuova categoria</h2>
+              <button onClick={() => setCatModal(false)}
+                style={{ background:"none", border:"none", cursor:"pointer", color:"var(--text-tertiary)", display:"flex" }}>
+                <X size={22} />
+              </button>
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <p style={{ margin:"0 0 6px", fontSize:13, color:"var(--text-tertiary)" }}>Nome categoria</p>
+              <input type="text" style={{ ...inputStyle, fontSize:15 }} placeholder="es. Fiori, Trasporti, Abbigliamento..."
+                value={catName} autoFocus
+                onChange={e => setCatName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") addCategory(); }} />
+            </div>
+            <button onClick={addCategory} style={{
+              width:"100%", padding:"14px", borderRadius:14,
+              background:"var(--brand)", border:"none", cursor:"pointer",
+              color:"#fff", fontSize:15, fontWeight:700,
+            }}>
+              Crea categoria
             </button>
           </div>
         </div>
