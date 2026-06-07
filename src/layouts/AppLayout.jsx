@@ -1,40 +1,49 @@
 import { Outlet, useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLang } from "../context/LangContext";
+import { useEvent, EventProvider } from "../context/EventContext";
 import {
   Home, Settings, ChevronLeft,
   BarChart2, CheckSquare, Users, UserCheck,
   TrendingUp, ClipboardList
 } from "lucide-react";
 
-export default function AppLayout() {
+const PRESETS = {
+  compleanno: { label: "Compleanno",          emoji: "🎂" },
+  laurea:     { label: "Laurea",              emoji: "🎓" },
+  nubilato:   { label: "Addio al nubilato",   emoji: "💍" },
+  aziendale:  { label: "Festa aziendale",     emoji: "🏢" },
+  cena:       { label: "Cena privata",        emoji: "🍽️" },
+  battesimo:  { label: "Battesimo/Comunione", emoji: "✝️" },
+  altro:      { label: "Altro",               emoji: "🎉" },
+};
+
+function Layout() {
   const { eventId } = useParams();
-  const { user }    = useAuth();
   const { t }       = useLang();
   const navigate    = useNavigate();
   const location    = useLocation();
+  const { event }   = useEvent();
 
   const isEventPage = !!eventId;
 
+  const preset = PRESETS[event?.preset] || PRESETS.altro;
+
   const eventTabs = [
-    { key: "panoramica",   label: t("overview"),    path: null            },
-    { key: "budget",       label: t("budget"),      path: "budget"        },
-    { key: "roadmap",      label: t("roadmap"),     path: "roadmap"       },
-    { key: "invitati",     label: t("guests"),      path: "invitati"      },
-    { key: "presenze",     label: t("attendance"),  path: "presenze"      },
-    { key: "scenari",      label: t("scenarios"),   path: "scenari"       },
-    { key: "survey",       label: t("survey"),      path: "survey"        },
-    { key: "impostazioni", label: t("settings"),    path: "impostazioni"  },
+    { key: "panoramica",   label: t("overview"),   path: null           },
+    { key: "budget",       label: t("budget"),     path: "budget"       },
+    { key: "roadmap",      label: t("roadmap"),    path: "roadmap"      },
+    { key: "invitati",     label: t("guests"),     path: "invitati"     },
+    { key: "presenze",     label: t("attendance"), path: "presenze"     },
+    { key: "scenari",      label: t("scenarios"),  path: "scenari"      },
+    { key: "survey",       label: t("survey"),     path: "survey"       },
+    { key: "impostazioni", label: t("settings"),   path: "impostazioni" },
   ];
 
   function isActive(path) {
     if (!path) return location.pathname === `/eventi/${eventId}`;
     return location.pathname.endsWith(`/${path}`);
   }
-
-  // Preset dell'evento per mostrare emoji (opzionale, solo se disponibile)
-  // Se non vuoi passare i dati evento all'AppLayout lascia solo il titolo
-  // dalla location state o dal DOM — per ora usiamo solo il path
 
   return (
     <div style={{ minHeight:"100vh", background:"var(--bg-primary)", display:"flex", flexDirection:"column" }}>
@@ -55,7 +64,6 @@ export default function AppLayout() {
           {isEventPage ? (
             /* ── Navbar evento ── */
             <div style={{ display:"flex", alignItems:"center", gap:8, paddingBottom:8 }}>
-              {/* Back */}
               <button
                 onClick={() => navigate("/eventi")}
                 style={{
@@ -69,26 +77,26 @@ export default function AppLayout() {
                 <ChevronLeft size={22} />
               </button>
 
-              {/* Titolo + data */}
               <div style={{ flex:1, minWidth:0 }}>
-                <h1 style={{
-                  margin:0, fontSize:17, fontWeight:700, lineHeight:1.2,
-                  color:"var(--text-primary)",
-                  overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-                }}>
-                  {/* Il nome evento viene mostrato dall'EventDashboard nel contenuto,
-                      qui mettiamo un placeholder generico che puoi sostituire
-                      passando il nome via context o location.state */}
-                  Evento
-                </h1>
-                <p style={{
-                  margin:0, fontSize:12, color:"var(--text-tertiary)", lineHeight:1.2, marginTop:1,
-                }}>
-                  &nbsp;
-                </p>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ fontSize:17, lineHeight:1 }}>{preset.emoji}</span>
+                  <h1 style={{
+                    margin:0, fontSize:17, fontWeight:700, lineHeight:1.2,
+                    color:"var(--text-primary)",
+                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                  }}>
+                    {event?.name || "Evento"}
+                  </h1>
+                </div>
+                {event?.event_date && (
+                  <p style={{ margin:"2px 0 0", fontSize:12, color:"var(--text-tertiary)", lineHeight:1.2 }}>
+                    {new Date(event.event_date).toLocaleDateString("it-IT", {
+                      day:"numeric", month:"long", year:"numeric"
+                    })} · {preset.label}
+                  </p>
+                )}
               </div>
 
-              {/* Settings */}
               <button
                 onClick={() => navigate(`/eventi/${eventId}/impostazioni`)}
                 style={{
@@ -131,11 +139,11 @@ export default function AppLayout() {
             </div>
           )}
 
-          {/* ── Tab bar evento (scrollabile) ── */}
+          {/* ── Tab bar scrollabile ── */}
           {isEventPage && (
             <div style={{
               display:"flex", overflowX:"auto", scrollbarWidth:"none",
-              gap:0, marginLeft:-16, marginRight:-16, paddingLeft:16, paddingRight:16,
+              marginLeft:-16, marginRight:-16, paddingLeft:16, paddingRight:16,
             }}>
               {eventTabs.map(tab => {
                 const active = isActive(tab.path);
@@ -172,8 +180,7 @@ export default function AppLayout() {
 
       {/* ── CONTENUTO ── */}
       <main style={{
-        flex:1,
-        maxWidth:672, margin:"0 auto", width:"100%",
+        flex:1, maxWidth:672, margin:"0 auto", width:"100%",
         padding:"20px 16px 96px",
       }}>
         <Outlet />
@@ -199,5 +206,13 @@ export default function AppLayout() {
         </nav>
       )}
     </div>
+  );
+}
+
+export default function AppLayout() {
+  return (
+    <EventProvider>
+      <Layout />
+    </EventProvider>
   );
 }
