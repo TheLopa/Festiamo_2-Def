@@ -1,38 +1,25 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { useLang } from "../context/LangContext";
-import { CheckCircle, Loader } from "lucide-react";
 
 export default function PurchaseSuccess() {
-  const { t } = useLang();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [eventId, setEventId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Aspetta un secondo che il webhook Stripe crei l'evento
     const timer = setTimeout(async () => {
-      await findNewEvent();
+      const { data } = await supabase
+        .from("events")
+        .select("id")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (data) setEventId(data.id);
+      setLoading(false);
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
-
-  async function findNewEvent() {
-    // Trova l'evento appena creato (il più recente)
-    const { data } = await supabase
-      .from("events")
-      .select("id")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (data) {
-      setEventId(data.id);
-    }
-    setLoading(false);
-  }
 
   function handleContinue() {
     if (eventId) {
@@ -43,49 +30,89 @@ export default function PurchaseSuccess() {
   }
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-4"
-      style={{ background: "var(--bg-primary)" }}
-    >
-      <div className="w-full max-w-sm text-center">
+    <div style={{
+      minHeight: "100vh",
+      background: "var(--bg-secondary)",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "24px 16px",
+      fontFamily: "Inter,system-ui,sans-serif",
+    }}>
+      {/* Brand */}
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:32 }}>
+        <div style={{
+          width:40, height:40, borderRadius:12,
+          background:"var(--brand)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+        }}>
+          <span style={{ fontSize:18 }}>✨</span>
+        </div>
+        <span style={{ fontSize:18, fontWeight:700, color:"var(--text-primary)" }}>Festiamo</span>
+      </div>
+
+      {/* Card */}
+      <div style={{
+        width:"100%", maxWidth:380,
+        background:"var(--bg-primary)",
+        border:"1px solid var(--border)",
+        borderRadius:20,
+        padding:32,
+        textAlign:"center",
+      }}>
         {loading ? (
-          <div className="flex flex-col items-center gap-4">
-            <Loader
-              size={40}
-              className="animate-spin"
-              style={{ color: "var(--brand)" }}
-            />
-            <p style={{ color: "var(--text-secondary)" }}>
-              Conferma pagamento in corso...
-            </p>
-          </div>
-        ) : (
-          <div className="card">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-              style={{ background: "var(--success-light)" }}
-            >
-              <CheckCircle size={32} style={{ color: "var(--success)" }} />
+          <>
+            <div style={{
+              width:56, height:56, borderRadius:"50%",
+              background:"var(--brand-light)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              margin:"0 auto 20px",
+              fontSize:28,
+            }}>
+              ⏳
             </div>
-            <h1
-              className="text-2xl font-bold mb-2"
-              style={{ color: "var(--text-primary)" }}
-            >
+            <h1 style={{ fontSize:22, fontWeight:800, margin:"0 0 8px", color:"var(--text-primary)" }}>
+              Conferma in corso...
+            </h1>
+            <p style={{ fontSize:14, color:"var(--text-secondary)", margin:0, lineHeight:1.6 }}>
+              Stiamo verificando il pagamento. Un momento.
+            </p>
+          </>
+        ) : (
+          <>
+            <div style={{
+              width:56, height:56, borderRadius:"50%",
+              background:"var(--success-light)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              margin:"0 auto 20px",
+              fontSize:28,
+            }}>
+              ✅
+            </div>
+            <h1 style={{ fontSize:22, fontWeight:800, margin:"0 0 8px", color:"var(--text-primary)" }}>
               Pagamento completato!
             </h1>
-            <p
-              className="text-sm mb-6"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <p style={{ fontSize:14, color:"var(--text-secondary)", margin:"0 0 24px", lineHeight:1.6 }}>
               Il tuo evento è stato creato. Ora scegli il tipo di evento e inizia a organizzare.
             </p>
             <button
-              className="btn-primary w-full py-3 text-base"
               onClick={handleContinue}
+              style={{
+                width:"100%",
+                background:"var(--brand)",
+                color:"#fff",
+                border:"none",
+                borderRadius:12,
+                padding:"13px",
+                fontSize:15,
+                fontWeight:600,
+                cursor:"pointer",
+              }}
             >
               Configura il tuo evento →
             </button>
-          </div>
+          </>
         )}
       </div>
     </div>
