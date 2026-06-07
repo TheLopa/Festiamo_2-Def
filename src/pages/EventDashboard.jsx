@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { supabase } from "../supabase";
+import { supabase } from "../lib/supabase";
 
 export default function EventDashboard() {
   const { id } = useParams();
