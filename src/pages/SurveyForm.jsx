@@ -6,21 +6,23 @@ import { Sparkles } from "lucide-react";
 export default function SurveyForm() {
   const { eventId } = useParams();
 
-  const [form, setForm]         = useState({ nome: "", email: "", conferma: null, genere: null });
+  const [form,      setForm]      = useState({ nome:"", email:"", conferma:null, genere:null });
   const [submitted, setSubmitted] = useState(false);
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState(null);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState(null);
+
+  const canSubmit = form.nome.trim() && form.email.trim() && form.conferma && !saving;
 
   async function handleSubmit() {
-    if (!form.nome.trim() || !form.email.trim() || !form.conferma) return;
+    if (!canSubmit) return;
     setSaving(true);
     setError(null);
     const { error: err } = await supabase.from("survey_responses").insert({
-      event_id: eventId,
-      respondent_name: form.nome.trim(),
+      event_id:         eventId,
+      respondent_name:  form.nome.trim(),
       respondent_email: form.email.trim(),
-      gender: form.genere,
-      confirmation: form.conferma,
+      gender:           form.genere,
+      confirmation:     form.conferma,
       is_in_guest_list: false,
     });
     if (err) {
@@ -31,21 +33,33 @@ export default function SurveyForm() {
     }
   }
 
-  const canSubmit = form.nome.trim() && form.email.trim() && form.conferma && !saving;
+  const inputStyle = {
+    background:"var(--bg-secondary)", border:"1px solid var(--border)",
+    borderRadius:12, padding:"13px 14px", color:"var(--text-primary)",
+    fontSize:16, width:"100%", boxSizing:"border-box", outline:"none",
+  };
 
+  /* ── Schermata di ringraziamento ── */
   if (submitted) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4"
-        style={{ background: "var(--bg-primary)" }}>
-        <div className="w-full max-w-sm text-center">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-            style={{ background: "var(--success-light)" }}>
-            <span style={{ fontSize: 32 }}>✓</span>
+      <div style={{
+        minHeight:"100vh", display:"flex", flexDirection:"column",
+        alignItems:"center", justifyContent:"center",
+        padding:"32px 24px", background:"var(--bg-primary)",
+      }}>
+        <div style={{ width:"100%", maxWidth:400, textAlign:"center" }}>
+          <div style={{
+            width:72, height:72, borderRadius:"50%", margin:"0 auto 20px",
+            background:"var(--success-light)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            fontSize:36,
+          }}>
+            ✓
           </div>
-          <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+          <h1 style={{ margin:"0 0 10px", fontSize:24, fontWeight:800, color:"var(--text-primary)" }}>
             Risposta inviata!
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          <p style={{ margin:0, fontSize:15, color:"var(--text-secondary)", lineHeight:1.5 }}>
             Grazie per aver risposto. L'organizzatore è stato notificato.
           </p>
         </div>
@@ -53,112 +67,177 @@ export default function SurveyForm() {
     );
   }
 
+  /* ── Form principale ── */
   return (
-    <div className="min-h-screen px-4 py-8" style={{ background: "var(--bg-primary)" }}>
-      <div className="w-full max-w-sm mx-auto">
+    <div style={{
+      minHeight:"100vh", background:"var(--bg-primary)",
+      padding:"24px 16px 48px",
+    }}>
+      <div style={{ width:"100%", maxWidth:480, margin:"0 auto" }}>
+
         {/* Brand */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl"
-            style={{ background: "var(--brand)" }}>
+        <div style={{
+          display:"flex", alignItems:"center", justifyContent:"center",
+          gap:8, marginBottom:24,
+        }}>
+          <div style={{
+            width:32, height:32, borderRadius:10,
+            background:"var(--brand)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+          }}>
             <Sparkles size={16} color="#fff" />
           </div>
-          <span className="font-bold text-base" style={{ color: "var(--text-primary)" }}>Festiamo</span>
+          <span style={{ fontSize:16, fontWeight:700, color:"var(--text-primary)" }}>Festiamo</span>
         </div>
 
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        {/* Card form */}
+        <div style={{
+          background:"var(--bg-secondary)", border:"1px solid var(--border)",
+          borderRadius:20, overflow:"hidden",
+        }}>
           {/* Hero */}
-          <div className="px-5 py-5" style={{ background: "var(--brand-light)" }}>
-            <h1 className="text-lg font-bold mb-1" style={{ color: "var(--brand-text)" }}>
+          <div style={{ padding:"20px 20px 18px", background:"var(--brand-light)" }}>
+            <h1 style={{ margin:"0 0 4px", fontSize:18, fontWeight:800, color:"var(--brand)" }}>
               Conferma la tua partecipazione
             </h1>
-            <p className="text-sm" style={{ color: "var(--brand-text)", opacity: 0.8 }}>
+            <p style={{ margin:0, fontSize:13, color:"var(--brand)", opacity:0.75 }}>
               Compila il form per far sapere se ci sarai
             </p>
           </div>
 
-          <div className="px-5 py-5 space-y-5">
+          <div style={{ padding:"20px 20px 28px", display:"flex", flexDirection:"column", gap:20 }}>
+
             {/* Nome */}
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+              <p style={{ margin:"0 0 8px", fontSize:14, fontWeight:600, color:"var(--text-secondary)" }}>
                 Nome e cognome
-              </label>
-              <input type="text" className="input-base" placeholder="Mario Rossi"
-                value={form.nome} onChange={e => setForm(p => ({ ...p, nome: e.target.value }))}
-                autoComplete="name" />
+              </p>
+              <input
+                type="text" style={inputStyle} placeholder="Mario Rossi"
+                value={form.nome} autoComplete="name"
+                onChange={e => setForm(p => ({ ...p, nome: e.target.value }))}
+              />
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+              <p style={{ margin:"0 0 8px", fontSize:14, fontWeight:600, color:"var(--text-secondary)" }}>
                 Email
-              </label>
-              <input type="email" className="input-base" placeholder="mario@email.com"
-                value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                autoComplete="email" />
+              </p>
+              <input
+                type="email" style={inputStyle} placeholder="mario@email.com"
+                value={form.email} autoComplete="email"
+                onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+              />
             </div>
 
             {/* Conferma */}
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+              <p style={{ margin:"0 0 10px", fontSize:14, fontWeight:600, color:"var(--text-secondary)" }}>
                 Partecipi?
-              </label>
-              <div className="space-y-2">
+              </p>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                 {[
-                  { val: "yes", label: "✓  Sì, ci sarò",        color: "var(--success)" },
-                  { val: "no",  label: "✗  No, non posso venire", color: "var(--danger)"  },
-                ].map(opt => (
-                  <button key={opt.val}
-                    onClick={() => setForm(p => ({ ...p, conferma: opt.val }))}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left"
-                    style={{
-                      background: form.conferma === opt.val ? "var(--bg-secondary)" : "var(--bg-primary)",
-                      border: form.conferma === opt.val ? `2px solid ${opt.color}` : "1px solid var(--border)",
-                      color: "var(--text-primary)", cursor: "pointer",
-                    }}>
-                    {opt.label}
-                  </button>
-                ))}
+                  { val:"yes", icon:"✓", label:"Sì, ci sarò",         color:"var(--success)" },
+                  { val:"no",  icon:"✗", label:"No, non posso venire", color:"var(--danger)"  },
+                ].map(opt => {
+                  const active = form.conferma === opt.val;
+                  return (
+                    <button
+                      key={opt.val}
+                      onClick={() => setForm(p => ({ ...p, conferma: opt.val }))}
+                      style={{
+                        display:"flex", alignItems:"center", gap:14,
+                        padding:"15px 16px", borderRadius:14, textAlign:"left", cursor:"pointer",
+                        background: active ? "var(--bg-primary)" : "transparent",
+                        border: active ? `2px solid ${opt.color}` : "1px solid var(--border)",
+                        transition:"border 0.15s, background 0.15s",
+                        WebkitTapHighlightColor:"transparent",
+                      }}
+                    >
+                      <span style={{
+                        width:36, height:36, borderRadius:"50%", flexShrink:0,
+                        background: active ? opt.color : "var(--bg-primary)",
+                        border: active ? "none" : "1px solid var(--border)",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        fontSize:18, color: active ? "#fff" : "var(--text-tertiary)",
+                        transition:"background 0.15s, color 0.15s",
+                      }}>
+                        {opt.icon}
+                      </span>
+                      <span style={{
+                        fontSize:15, fontWeight: active ? 700 : 400,
+                        color: active ? "var(--text-primary)" : "var(--text-secondary)",
+                      }}>
+                        {opt.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Genere */}
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
-                Genere <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>(facoltativo)</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
+              <p style={{ margin:"0 0 10px", fontSize:14, fontWeight:600, color:"var(--text-secondary)" }}>
+                Genere{" "}
+                <span style={{ fontSize:12, color:"var(--text-tertiary)", fontWeight:400 }}>
+                  (facoltativo)
+                </span>
+              </p>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
                 {[
-                  { val: "M",    label: "M" },
-                  { val: "F",    label: "F" },
-                  { val: "altro",label: "Altro" },
-                  { val: null,   label: "Preferisco non dirlo" },
-                ].map(opt => (
-                  <button key={String(opt.val)}
-                    onClick={() => setForm(p => ({ ...p, genere: opt.val }))}
-                    className="py-2.5 rounded-xl text-sm text-center"
-                    style={{
-                      background: form.genere === opt.val ? "var(--brand-light)" : "var(--bg-secondary)",
-                      color: form.genere === opt.val ? "var(--brand-text)" : "var(--text-secondary)",
-                      border: form.genere === opt.val ? "2px solid var(--brand)" : "1px solid var(--border)",
-                      cursor: "pointer",
-                    }}>
-                    {opt.label}
-                  </button>
-                ))}
+                  { val:"M",    label:"M 👨"              },
+                  { val:"F",    label:"F 👩"              },
+                  { val:"altro",label:"Altro"             },
+                  { val:null,   label:"Preferisco non dirlo" },
+                ].map(opt => {
+                  const active = form.genere === opt.val;
+                  return (
+                    <button
+                      key={String(opt.val)}
+                      onClick={() => setForm(p => ({ ...p, genere: opt.val }))}
+                      style={{
+                        padding:"12px 8px", borderRadius:12, fontSize:14,
+                        fontWeight: active ? 600 : 400, textAlign:"center", cursor:"pointer",
+                        background: active ? "var(--brand-light)" : "var(--bg-primary)",
+                        color:      active ? "var(--brand)"       : "var(--text-secondary)",
+                        border:     active ? "2px solid var(--brand)" : "1px solid var(--border)",
+                        transition:"border 0.15s, background 0.15s, color 0.15s",
+                        WebkitTapHighlightColor:"transparent",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
+            {/* Errore */}
             {error && (
-              <p className="text-sm text-center" style={{ color: "var(--danger)" }}>{error}</p>
+              <p style={{ margin:0, fontSize:13, color:"var(--danger)", textAlign:"center" }}>
+                {error}
+              </p>
             )}
 
+            {/* Submit */}
             <button
-              className="btn-primary w-full py-3 text-base"
-              disabled={!canSubmit}
               onClick={handleSubmit}
+              disabled={!canSubmit}
+              style={{
+                width:"100%", padding:"16px", borderRadius:14,
+                background: canSubmit ? "var(--brand)" : "var(--bg-primary)",
+                border:"none", cursor: canSubmit ? "pointer" : "not-allowed",
+                color: canSubmit ? "#fff" : "var(--text-tertiary)",
+                fontSize:16, fontWeight:700,
+                transition:"background 0.2s, color 0.2s",
+                WebkitTapHighlightColor:"transparent",
+              }}
             >
               {saving ? "Invio in corso..." : "Invia risposta"}
             </button>
+
           </div>
         </div>
       </div>
