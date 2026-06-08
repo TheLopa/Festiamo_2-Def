@@ -18,23 +18,24 @@ const PRESETS = [
 export default function Settings() {
   const { eventId } = useParams();
   const { t, lang, setLang } = useLang();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme }  = useTheme();
 
-  const [event, setEvent]                 = useState(null);
-  const [loading, setLoading]             = useState(true);
-  const [saving, setSaving]               = useState(false);
-  const [showWarning, setShowWarning]     = useState(false);
-  const [pendingPreset, setPendingPreset] = useState(null);
-  const [toastVisible, setToastVisible]   = useState(false);
+  const [event,        setEvent]        = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [saving,       setSaving]       = useState(false);
+  const [toastMsg,     setToastMsg]     = useState("");
+  const [showWarning,  setShowWarning]  = useState(false);
+  const [pendingPreset,setPendingPreset]= useState(null);
 
   useEffect(() => { fetchEvent(); }, [eventId]);
 
+  function showToast(msg = "Salvato") {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 2000);
+  }
+
   async function fetchEvent() {
-    const { data } = await supabase
-      .from("events")
-      .select("*")
-      .eq("id", eventId)
-      .single();
+    const { data } = await supabase.from("events").select("*").eq("id", eventId).single();
     setEvent(data);
     setLoading(false);
   }
@@ -43,8 +44,7 @@ export default function Settings() {
     setSaving(true);
     await supabase.from("events").update(updates).eq("id", eventId);
     setSaving(false);
-    setToastVisible(true);
-    setTimeout(() => setToastVisible(false), 1800);
+    showToast();
   }, [eventId]);
 
   function handleField(field, value) {
@@ -66,156 +66,219 @@ export default function Settings() {
     setPendingPreset(null);
   }
 
-  function cancelPreset() {
-    setShowWarning(false);
-    setPendingPreset(null);
-  }
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <p style={{ color: "var(--text-tertiary)" }}>{t("loading")}</p>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}>
+        <div style={{
+          width:28, height:28, borderRadius:"50%",
+          border:"3px solid var(--brand)", borderTopColor:"transparent",
+          animation:"spin 0.7s linear infinite",
+        }}/>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
 
+  const inputStyle = {
+    background:"var(--bg-primary)", border:"1px solid var(--border)",
+    borderRadius:10, padding:"11px 12px", color:"var(--text-primary)",
+    fontSize:15, width:"100%", boxSizing:"border-box",
+  };
+
+  const cardStyle = {
+    background:"var(--bg-secondary)", border:"1px solid var(--border)",
+    borderRadius:16, padding:"16px", marginBottom:12,
+  };
+
+  const labelStyle = {
+    display:"block", fontSize:13, fontWeight:500,
+    color:"var(--text-secondary)", marginBottom:8,
+  };
+
+  const sectionLabel = {
+    fontSize:10, fontWeight:600, letterSpacing:"0.1em",
+    textTransform:"uppercase", color:"var(--text-tertiary)",
+    margin:"0 0 8px",
+  };
+
+  const segBtn = (active) => ({
+    flex:1, padding:"10px 8px", borderRadius:10,
+    fontSize:13, fontWeight: active ? 600 : 400, cursor:"pointer",
+    background: active ? "var(--brand-light)" : "var(--bg-primary)",
+    color:      active ? "var(--brand)"       : "var(--text-secondary)",
+    border:     active ? "2px solid var(--brand)" : "1px solid var(--border)",
+    WebkitTapHighlightColor:"transparent",
+    transition:"background 0.15s, color 0.15s, border 0.15s",
+  });
+
+  const stepperBtn = {
+    width:44, height:44, borderRadius:10,
+    background:"var(--bg-primary)", border:"1px solid var(--border)",
+    fontSize:22, cursor:"pointer", color:"var(--text-primary)",
+    display:"flex", alignItems:"center", justifyContent:"center",
+    flexShrink:0, WebkitTapHighlightColor:"transparent",
+  };
+
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-2xl flex-shrink-0"
-          style={{ background: "var(--brand-light)" }}
-        >
-          <SettingsIcon size={20} style={{ color: "var(--brand)" }} />
+    <div style={{ paddingBottom:40 }}>
+
+      {/* Toast */}
+      {toastMsg && (
+        <div style={{
+          position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)",
+          background:"var(--success)", color:"#fff",
+          padding:"8px 20px", borderRadius:20, fontSize:13, fontWeight:600,
+          zIndex:300, pointerEvents:"none", whiteSpace:"nowrap",
+        }}>
+          {toastMsg} ✓
         </div>
-        <div className="flex-1">
-          <h1 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+      )}
+
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
+        <div style={{
+          width:40, height:40, borderRadius:12, flexShrink:0,
+          background:"var(--brand-light)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+        }}>
+          <SettingsIcon size={20} style={{ color:"var(--brand)" }} />
+        </div>
+        <div style={{ flex:1 }}>
+          <h1 style={{ margin:0, fontSize:17, fontWeight:700, color:"var(--text-primary)" }}>
             {t("settings")}
           </h1>
-          <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+          <p style={{ margin:0, fontSize:12, color:"var(--text-tertiary)" }}>
             {saving ? "Salvataggio..." : t("autosave")}
           </p>
         </div>
-        {toastVisible && (
-          <span className="text-xs font-medium" style={{ color: "var(--success)" }}>
-            {t("saved")} ✓
-          </span>
-        )}
       </div>
 
-      {/* Dettagli evento */}
-      <p className="section-label">Dettagli evento</p>
-      <div className="card mb-4">
-        <div className="mb-4">
-          <label className="block text-sm mb-1.5" style={{ color: "var(--text-secondary)" }}>
-            {t("event_name")}
-          </label>
+      {/* ── Dettagli evento ── */}
+      <p style={sectionLabel}>Dettagli evento</p>
+      <div style={cardStyle}>
+        <div style={{ marginBottom:16 }}>
+          <label style={labelStyle}>{t("event_name")}</label>
           <input
-            type="text"
-            className="input-base"
-            value={event?.name || ""}
+            type="text" style={inputStyle}
+            value={event?.name || ""} placeholder="Es. Compleanno Sofia"
             onChange={e => handleField("name", e.target.value)}
-            placeholder="Es. Compleanno Sofia"
           />
         </div>
         <div>
-          <label className="block text-sm mb-1.5" style={{ color: "var(--text-secondary)" }}>
-            {t("event_date")}
-          </label>
+          <label style={labelStyle}>{t("event_date")}</label>
           <input
-            type="date"
-            className="input-base"
+            type="date" style={inputStyle}
             value={event?.event_date || ""}
             onChange={e => handleField("event_date", e.target.value)}
           />
         </div>
       </div>
 
-      {/* Parametri */}
-      <p className="section-label">Parametri</p>
-      <div className="card mb-4">
-        <div className="mb-4">
-          <label className="block text-sm mb-1.5" style={{ color: "var(--text-secondary)" }}>
-            {t("planned_guests")}
-          </label>
-          <div className="stepper">
+      {/* ── Parametri ── */}
+      <p style={sectionLabel}>Parametri</p>
+      <div style={cardStyle}>
+        {/* Ospiti */}
+        <div style={{ marginBottom:16 }}>
+          <label style={labelStyle}>{t("planned_guests")}</label>
+          <div style={{
+            display:"flex", alignItems:"center", gap:12,
+            background:"var(--bg-primary)", border:"1px solid var(--border)",
+            borderRadius:12, padding:4,
+          }}>
             <button
-              className="stepper-btn"
+              style={stepperBtn}
               onClick={() => handleField("planned_guests", Math.max(1, (event?.planned_guests || 1) - 1))}
             >−</button>
-            <span className="stepper-val">{event?.planned_guests || 0}</span>
+            <span style={{ flex:1, textAlign:"center", fontSize:22, fontWeight:800, color:"var(--text-primary)" }}>
+              {event?.planned_guests || 0}
+            </span>
             <button
-              className="stepper-btn"
+              style={stepperBtn}
               onClick={() => handleField("planned_guests", (event?.planned_guests || 0) + 1)}
             >+</button>
           </div>
         </div>
+
+        {/* Drinks per persona */}
         <div>
-          <label className="block text-sm mb-1.5" style={{ color: "var(--text-secondary)" }}>
-            {t("drinks_per_person")}
-          </label>
-          <div className="stepper">
+          <label style={labelStyle}>{t("drinks_per_person")}</label>
+          <div style={{
+            display:"flex", alignItems:"center", gap:12,
+            background:"var(--bg-primary)", border:"1px solid var(--border)",
+            borderRadius:12, padding:4,
+          }}>
             <button
-              className="stepper-btn"
-              onClick={() => handleField("drinks_per_person", Math.max(1, (event?.drinks_per_person || 1) - 1))}
+              style={stepperBtn}
+              onClick={() => handleField("drinks_per_person", Math.max(0, (event?.drinks_per_person || 0) - 0.5))}
             >−</button>
-            <span className="stepper-val">{event?.drinks_per_person || 0}</span>
+            <span style={{ flex:1, textAlign:"center", fontSize:22, fontWeight:800, color:"var(--text-primary)" }}>
+              {event?.drinks_per_person || 0}
+            </span>
             <button
-              className="stepper-btn"
-              onClick={() => handleField("drinks_per_person", (event?.drinks_per_person || 0) + 1)}
+              style={stepperBtn}
+              onClick={() => handleField("drinks_per_person", (event?.drinks_per_person || 0) + 0.5)}
             >+</button>
           </div>
         </div>
       </div>
 
-      {/* Preset */}
-      <p className="section-label">{t("preset")}</p>
-      <div className="card mb-4">
-        <div className="grid grid-cols-2 gap-2">
-          {PRESETS.map(p => (
-            <button
-              key={p.key}
-              onClick={() => handlePresetClick(p.key)}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium"
-              style={{
-                background: event?.preset === p.key ? "var(--brand-light)" : "var(--bg-secondary)",
-                color: event?.preset === p.key ? "var(--brand-text)" : "var(--text-primary)",
-                border: event?.preset === p.key
-                  ? "2px solid var(--brand)"
-                  : "1px solid var(--border)",
-                cursor: "pointer",
-              }}
-            >
-              <span>{p.emoji}</span>
-              <span>{t(`preset_${p.key}`)}</span>
-            </button>
-          ))}
+      {/* ── Preset ── */}
+      <p style={sectionLabel}>{t("preset")}</p>
+      <div style={cardStyle}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          {PRESETS.map(p => {
+            const active = event?.preset === p.key;
+            return (
+              <button
+                key={p.key}
+                onClick={() => handlePresetClick(p.key)}
+                style={{
+                  display:"flex", alignItems:"center", gap:10,
+                  padding:"12px 14px", borderRadius:12, cursor:"pointer",
+                  background: active ? "var(--brand-light)" : "var(--bg-primary)",
+                  color:      active ? "var(--brand)"       : "var(--text-primary)",
+                  border:     active ? "2px solid var(--brand)" : "1px solid var(--border)",
+                  fontSize:14, fontWeight: active ? 600 : 400,
+                  transition:"background 0.15s, border 0.15s",
+                  WebkitTapHighlightColor:"transparent",
+                }}
+              >
+                <span style={{ fontSize:20 }}>{p.emoji}</span>
+                <span>{t(`preset_${p.key}`)}</span>
+              </button>
+            );
+          })}
         </div>
 
+        {/* Warning cambio preset */}
         {showWarning && (
-          <div
-            className="mt-4 rounded-xl p-4"
-            style={{ background: "var(--warning-light)", border: "1px solid var(--warning)" }}
-          >
-            <div className="flex items-start gap-2 mb-3">
-              <AlertTriangle size={16} style={{ color: "var(--warning)", flexShrink: 0, marginTop: 1 }} />
-              <p className="text-sm" style={{ color: "var(--warning-text)" }}>
+          <div style={{
+            marginTop:16, borderRadius:12, padding:"14px 16px",
+            background:"var(--warning-light)", border:"1px solid var(--warning)",
+          }}>
+            <div style={{ display:"flex", alignItems:"flex-start", gap:10, marginBottom:14 }}>
+              <AlertTriangle size={18} style={{ color:"var(--warning)", flexShrink:0, marginTop:1 }} />
+              <p style={{ margin:0, fontSize:13, color:"var(--warning)", lineHeight:1.5 }}>
                 {t("preset_warning")}
               </p>
             </div>
-            <div className="flex gap-2">
-              <button className="btn-secondary flex-1 py-2 text-sm" onClick={cancelPreset}>
+            <div style={{ display:"flex", gap:10 }}>
+              <button
+                onClick={() => { setShowWarning(false); setPendingPreset(null); }}
+                style={{
+                  flex:1, padding:"11px", borderRadius:10,
+                  background:"var(--bg-secondary)", border:"1px solid var(--border)",
+                  color:"var(--text-secondary)", fontSize:14, fontWeight:500, cursor:"pointer",
+                }}
+              >
                 {t("cancel")}
               </button>
               <button
                 onClick={confirmPreset}
-                className="flex-1 py-2 text-sm rounded-full font-semibold"
                 style={{
-                  background: "var(--danger-light)",
-                  color: "var(--danger-text)",
-                  border: "none",
-                  cursor: "pointer",
+                  flex:1, padding:"11px", borderRadius:10,
+                  background:"var(--danger-light)", border:"1px solid var(--danger)",
+                  color:"var(--danger)", fontSize:14, fontWeight:600, cursor:"pointer",
                 }}
               >
                 {t("change_preset")}
@@ -225,49 +288,29 @@ export default function Settings() {
         )}
       </div>
 
-      {/* Preferenze app */}
-      <p className="section-label">{t("app_settings")}</p>
-      <div className="card mb-4">
-        <div className="mb-4">
-          <label className="block text-sm mb-2" style={{ color: "var(--text-secondary)" }}>
-            {t("theme")}
-          </label>
-          <div className="flex gap-2">
+      {/* ── Preferenze app ── */}
+      <p style={sectionLabel}>{t("app_settings")}</p>
+      <div style={cardStyle}>
+        {/* Tema */}
+        <div style={{ marginBottom:16 }}>
+          <label style={labelStyle}>{t("theme")}</label>
+          <div style={{ display:"flex", gap:10, background:"var(--bg-primary)",
+            border:"1px solid var(--border)", borderRadius:10, padding:3 }}>
             {["dark", "light"].map(th => (
-              <button
-                key={th}
-                onClick={() => setTheme(th)}
-                className="flex-1 py-2 rounded-xl text-sm font-medium"
-                style={{
-                  background: theme === th ? "var(--brand-light)" : "var(--bg-secondary)",
-                  color: theme === th ? "var(--brand-text)" : "var(--text-secondary)",
-                  border: theme === th ? "2px solid var(--brand)" : "1px solid var(--border)",
-                  cursor: "pointer",
-                }}
-              >
+              <button key={th} onClick={() => setTheme(th)} style={segBtn(theme === th)}>
                 {th === "dark" ? `🌙 ${t("theme_dark")}` : `☀️ ${t("theme_light")}`}
               </button>
             ))}
           </div>
         </div>
 
+        {/* Lingua */}
         <div>
-          <label className="block text-sm mb-2" style={{ color: "var(--text-secondary)" }}>
-            {t("language")}
-          </label>
-          <div className="flex gap-2">
+          <label style={labelStyle}>{t("language")}</label>
+          <div style={{ display:"flex", gap:10, background:"var(--bg-primary)",
+            border:"1px solid var(--border)", borderRadius:10, padding:3 }}>
             {["it", "en"].map(l => (
-              <button
-                key={l}
-                onClick={() => setLang(l)}
-                className="flex-1 py-2 rounded-xl text-sm font-medium"
-                style={{
-                  background: lang === l ? "var(--brand-light)" : "var(--bg-secondary)",
-                  color: lang === l ? "var(--brand-text)" : "var(--text-secondary)",
-                  border: lang === l ? "2px solid var(--brand)" : "1px solid var(--border)",
-                  cursor: "pointer",
-                }}
-              >
+              <button key={l} onClick={() => setLang(l)} style={segBtn(lang === l)}>
                 {l === "it" ? `🇮🇹 ${t("lang_it")}` : `🇬🇧 ${t("lang_en")}`}
               </button>
             ))}
