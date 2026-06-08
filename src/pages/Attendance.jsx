@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useLang } from "../context/LangContext";
-import { UserCheck, Plus, Trash2, Download, Search } from "lucide-react";
+import { UserCheck, Plus, Trash2, Download, Search, X } from "lucide-react";
 
 function initials(name) {
   if (!name) return "?";
@@ -10,10 +10,10 @@ function initials(name) {
 }
 
 const AVATAR_COLORS = [
-  { bg: "var(--brand-light)",   fg: "var(--brand-text)"  },
-  { bg: "var(--success-light)", fg: "var(--success-text)" },
-  { bg: "var(--warning-light)", fg: "var(--warning-text)" },
-  { bg: "var(--danger-light)",  fg: "var(--danger-text)"  },
+  { bg: "var(--brand-light)",   fg: "var(--brand)"   },
+  { bg: "var(--success-light)", fg: "var(--success)"  },
+  { bg: "var(--warning-light)", fg: "var(--warning)"  },
+  { bg: "var(--danger-light)",  fg: "var(--danger)"   },
 ];
 
 function avatarColor(name) {
@@ -25,17 +25,23 @@ export default function Attendance() {
   const { eventId } = useParams();
   const { t } = useLang();
 
-  const [guestGroups, setGuestGroups]   = useState([]);
-  const [walkins, setWalkins]           = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMsg, setToastMsg]         = useState("");
-  const [filter, setFilter]             = useState("tutti");
-  const [search, setSearch]             = useState("");
-  const [showAddWalkin, setShowAddWalkin] = useState(false);
-  const [walkinName, setWalkinName]     = useState("");
+  const [guestGroups,    setGuestGroups]    = useState([]);
+  const [walkins,        setWalkins]        = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [toastMsg,       setToastMsg]       = useState("");
+  const [filter,         setFilter]         = useState("tutti");
+  const [search,         setSearch]         = useState("");
+
+  // Modal walk-in
+  const [walkinModal, setWalkinModal] = useState(false);
+  const [walkinName,  setWalkinName]  = useState("");
 
   useEffect(() => { fetchData(); }, [eventId]);
+
+  function showToast(msg = "Salvato") {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 2000);
+  }
 
   async function fetchData() {
     const { data: groups } = await supabase
@@ -44,7 +50,6 @@ export default function Attendance() {
       .eq("event_id", eventId)
       .order("sort_order");
 
-    // Walk-in: guests senza group_id e is_walkin = true
     const { data: wk } = await supabase
       .from("guests")
       .select("*")
@@ -56,18 +61,12 @@ export default function Attendance() {
     setLoading(false);
   }
 
-  function showToast(msg = t("saved")) {
-    setToastMsg(msg);
-    setToastVisible(true);
-    setTimeout(() => setToastVisible(false), 1800);
-  }
-
-  const allGuests   = guestGroups.flatMap(g => g.guests || []);
-  const cntPresent  = allGuests.filter(g => g.presence === "present").length;
-  const cntAbsent   = allGuests.filter(g => g.presence === "absent").length;
-  const cntWalkin   = walkins.length;
-  const total       = cntPresent + cntWalkin;
-  const pct         = allGuests.length ? Math.round((cntPresent / allGuests.length) * 100) : 0;
+  const allGuests  = guestGroups.flatMap(g => g.guests || []);
+  const cntPresent = allGuests.filter(g => g.presence === "present").length;
+  const cntAbsent  = allGuests.filter(g => g.presence === "absent").length;
+  const cntWalkin  = walkins.length;
+  const total      = cntPresent + cntWalkin;
+  const pct        = allGuests.length ? Math.round((cntPresent / allGuests.length) * 100) : 0;
 
   async function togglePresence(guestId, groupId, current) {
     const next = current === "present" ? "absent" : "present";
@@ -80,40 +79,38 @@ export default function Attendance() {
   }
 
   async function addWalkin() {
-    const name = walkinName.trim();
+    const name = walkinName.trim() || "Sconosciuto";
     const [first, ...rest] = name.split(" ");
     const { data } = await supabase
       .from("guests")
       .insert({
         event_id: eventId,
-        first_name: first || "Sconosciuto",
+        first_name: first,
         last_name: rest.join(" ") || "",
         is_walkin: true,
         presence: "present",
         confirmation: "yes",
       })
-      .select()
-      .single();
+      .select().single();
     if (data) setWalkins(prev => [...prev, data]);
+    setWalkinModal(false);
     setWalkinName("");
-    setShowAddWalkin(false);
     showToast("Walk-in registrato");
   }
 
   async function deleteWalkin(id) {
     setWalkins(prev => prev.filter(w => w.id !== id));
     await supabase.from("guests").delete().eq("id", id);
-    showToast();
+    showToast("Eliminato");
   }
 
   function filteredGuests(guests) {
     return (guests || []).filter(gu => {
       const mf = filter === "tutti"
         || (filter === "present" && gu.presence === "present")
-        || (filter === "absent"  && gu.presence === "absent");
+        || (filter === "absent"  && gu.presence !== "present");
       const name = `${gu.first_name} ${gu.last_name}`.toLowerCase();
-      const ms = !search || name.includes(search.toLowerCase());
-      return mf && ms;
+      return mf && (!search || name.includes(search.toLowerCase()));
     });
   }
 
@@ -121,7 +118,8 @@ export default function Attendance() {
     const rows = [["Nome", "Cognome", "Gruppo", "Presenza"]];
     guestGroups.forEach(g => {
       (g.guests || []).forEach(gu => {
-        rows.push([gu.first_name, gu.last_name, g.name, gu.presence === "present" ? "Presente" : "Assente"]);
+        rows.push([gu.first_name, gu.last_name, g.name,
+          gu.presence === "present" ? "Presente" : "Assente"]);
       });
     });
     walkins.forEach(w => {
@@ -133,141 +131,221 @@ export default function Attendance() {
     const a    = document.createElement("a");
     a.href = url; a.download = "presenze.csv"; a.click();
     URL.revokeObjectURL(url);
+    showToast("Scaricato!");
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <p style={{ color: "var(--text-tertiary)" }}>{t("loading")}</p>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"40vh" }}>
+        <div style={{
+          width:28, height:28, borderRadius:"50%",
+          border:"3px solid var(--brand)", borderTopColor:"transparent",
+          animation:"spin 0.7s linear infinite",
+        }}/>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
 
+  const cardStyle = {
+    background:"var(--bg-secondary)", border:"1px solid var(--border)",
+    borderRadius:16, overflow:"hidden", marginBottom:12,
+  };
+
+  const inputStyle = {
+    background:"var(--bg-primary)", border:"1px solid var(--border)",
+    borderRadius:8, padding:"10px 12px", color:"var(--text-primary)",
+    fontSize:14, width:"100%", boxSizing:"border-box",
+  };
+
+  const overlayStyle = {
+    position:"fixed", inset:0, zIndex:200,
+    background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)",
+    display:"flex", alignItems:"flex-end",
+  };
+
+  const sheetStyle = {
+    width:"100%", background:"var(--bg-secondary)",
+    borderRadius:"20px 20px 0 0", padding:"24px 20px 40px",
+    maxHeight:"85vh", overflowY:"auto", boxSizing:"border-box",
+  };
+
   return (
-    <div>
+    <div style={{ paddingBottom:32 }}>
+
+      {/* Toast */}
+      {toastMsg && (
+        <div style={{
+          position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)",
+          background:"var(--success)", color:"#fff",
+          padding:"8px 20px", borderRadius:20, fontSize:13, fontWeight:600,
+          zIndex:300, pointerEvents:"none", whiteSpace:"nowrap",
+        }}>
+          {toastMsg} ✓
+        </div>
+      )}
+
       {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl flex-shrink-0"
-          style={{ background: "var(--success-light)" }}>
-          <UserCheck size={20} style={{ color: "var(--success)" }} />
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
+        <div style={{
+          width:40, height:40, borderRadius:12, flexShrink:0,
+          background:"var(--success-light)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+        }}>
+          <UserCheck size={20} style={{ color:"var(--success)" }} />
         </div>
-        <div className="flex-1">
-          <h1 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>{t("attendance")}</h1>
-          <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>Giorno dell'evento</p>
+        <div style={{ flex:1 }}>
+          <h1 style={{ margin:0, fontSize:17, fontWeight:700, color:"var(--text-primary)" }}>Presenze</h1>
+          <p style={{ margin:0, fontSize:12, color:"var(--text-tertiary)" }}>Giorno dell'evento</p>
         </div>
-        {toastVisible && (
-          <span className="text-xs font-medium" style={{ color: "var(--success)" }}>{toastMsg} ✓</span>
-        )}
+        <button
+          onClick={downloadCSV}
+          style={{
+            display:"flex", alignItems:"center", gap:6, padding:"8px 12px",
+            borderRadius:10, background:"var(--bg-secondary)",
+            border:"1px solid var(--border)", cursor:"pointer",
+            color:"var(--text-primary)", fontSize:13,
+          }}
+        >
+          <Download size={15}/> CSV
+        </button>
       </div>
 
       {/* Contatori */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:8, marginBottom:16 }}>
         {[
-          { label: t("present"), count: cntPresent, color: "var(--success)"        },
-          { label: t("absent"),  count: cntAbsent,  color: "var(--text-secondary)" },
-          { label: t("walkin"),  count: cntWalkin,  color: "var(--warning)"        },
-          { label: t("total"),   count: total,       color: "var(--text-primary)"   },
+          { label:"Presenti",  count:cntPresent, color:"var(--success)"        },
+          { label:"Assenti",   count:cntAbsent,  color:"var(--text-secondary)" },
+          { label:"Walk-in",   count:cntWalkin,  color:"var(--warning)"        },
+          { label:"Totale",    count:total,       color:"var(--text-primary)"   },
         ].map(s => (
-          <div key={s.label} className="card text-center py-2 px-1">
-            <p className="text-lg font-bold" style={{ color: s.color }}>{s.count}</p>
-            <p className="text-xs mt-0.5" style={{ color: "var(--text-tertiary)" }}>{s.label}</p>
+          <div key={s.label} style={{ ...cardStyle, marginBottom:0, padding:"10px 8px", textAlign:"center" }}>
+            <p style={{ margin:0, fontSize:18, fontWeight:800, color:s.color }}>{s.count}</p>
+            <p style={{ margin:"2px 0 0", fontSize:10, color:"var(--text-tertiary)" }}>{s.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Progress check-in */}
-      <div className="card mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>{t("checkin")}</p>
-          <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>{pct}%</p>
+      {/* Progress bar */}
+      <div style={{ ...cardStyle, padding:"14px 16px" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+          <p style={{ margin:0, fontSize:13, color:"var(--text-secondary)" }}>Check-in completato</p>
+          <p style={{ margin:0, fontSize:14, fontWeight:700, color:"var(--text-primary)" }}>{pct}%</p>
         </div>
-        <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${pct}%` }} />
+        <div style={{ height:6, borderRadius:3, background:"var(--bg-primary)", overflow:"hidden" }}>
+          <div style={{
+            height:"100%", width:`${pct}%`,
+            background:"var(--success)", borderRadius:3,
+            transition:"width 0.3s ease",
+          }}/>
         </div>
       </div>
 
-      {/* Search + download */}
-      <div className="flex gap-2 mb-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: "var(--text-tertiary)" }} />
-          <input type="search" className="input-base pl-8" placeholder={t("search_name")}
-            value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <button className="btn-secondary px-3 flex items-center gap-1 text-sm" onClick={downloadCSV}>
-          <Download size={14} /> {t("download_csv")}
-        </button>
+      {/* Search */}
+      <div style={{ position:"relative", margin:"16px 0 10px" }}>
+        <Search size={16} style={{
+          position:"absolute", left:12, top:"50%", transform:"translateY(-50%)",
+          color:"var(--text-tertiary)", pointerEvents:"none",
+        }}/>
+        <input type="search" placeholder="Cerca per nome..."
+          value={search} onChange={e => setSearch(e.target.value)}
+          style={{ ...inputStyle, paddingLeft:36 }} />
       </div>
 
       {/* Filtri */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+      <div style={{ display:"flex", gap:8, overflowX:"auto", scrollbarWidth:"none", marginBottom:16, paddingBottom:2 }}>
         {[
-          { key: "tutti",   label: t("filter_all") },
-          { key: "present", label: t("present")    },
-          { key: "absent",  label: t("absent")     },
+          { key:"tutti",   label:"Tutti"    },
+          { key:"present", label:"Presenti" },
+          { key:"absent",  label:"Assenti"  },
         ].map(f => (
           <button key={f.key} onClick={() => setFilter(f.key)}
-            className="text-xs px-3 py-1.5 rounded-full flex-shrink-0"
             style={{
+              flexShrink:0, padding:"6px 14px", borderRadius:20,
+              fontSize:12, fontWeight:500, cursor:"pointer",
               background: filter === f.key ? "var(--brand-light)" : "var(--bg-secondary)",
-              color: filter === f.key ? "var(--brand-text)" : "var(--text-secondary)",
-              border: filter === f.key ? "1px solid var(--brand)" : "1px solid var(--border)",
-              cursor: "pointer",
-            }}>
+              color:      filter === f.key ? "var(--brand)"       : "var(--text-secondary)",
+              border:     filter === f.key ? "1px solid var(--brand)" : "1px solid var(--border)",
+              WebkitTapHighlightColor:"transparent",
+            }}
+          >
             {f.label}
           </button>
         ))}
       </div>
 
-      {/* Gruppi invitati */}
-      {filter !== "walkin" && guestGroups.map(group => {
-        const filtered  = filteredGuests(group.guests);
-        const presenti  = (group.guests || []).filter(g => g.presence === "present").length;
+      {/* Gruppi */}
+      {guestGroups.map(group => {
+        const filtered = filteredGuests(group.guests);
+        const presenti = (group.guests || []).filter(g => g.presence === "present").length;
         if (filtered.length === 0 && search) return null;
+        if (filtered.length === 0 && filter !== "tutti") return null;
 
         return (
-          <div key={group.id} className="card mb-3" style={{ padding: 0, overflow: "hidden" }}>
-            <div className="flex items-center justify-between px-4 py-3"
-              style={{ background: "var(--bg-secondary)" }}>
-              <span className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>{group.name}</span>
-              <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-                {presenti}/{(group.guests || []).length} presenti
+          <div key={group.id} style={cardStyle}>
+            {/* Header gruppo */}
+            <div style={{
+              display:"flex", alignItems:"center", justifyContent:"space-between",
+              padding:"11px 16px", borderBottom:"1px solid var(--border)",
+              background:"var(--bg-secondary)",
+            }}>
+              <span style={{ fontSize:14, fontWeight:600, color:"var(--text-primary)" }}>{group.name}</span>
+              <span style={{ fontSize:12, color:"var(--text-tertiary)" }}>
+                {presenti}/{(group.guests || []).length} ✓
               </span>
             </div>
 
             {filtered.map(guest => {
               const isPresent = guest.presence === "present";
-              const col = avatarColor(guest.first_name);
+              const col  = avatarColor(guest.first_name);
               const name = `${guest.first_name} ${guest.last_name}`.trim();
               return (
-                <div key={guest.id}
-                  className="flex items-center gap-3 px-4 py-2.5"
-                  style={{
-                    borderBottom: "1px solid var(--border)",
-                    background: isPresent ? "var(--success-light)" : "var(--bg-primary)",
+                <div key={guest.id} style={{
+                  display:"flex", alignItems:"center", gap:10,
+                  padding:"10px 16px", borderBottom:"1px solid var(--border)",
+                  background: isPresent ? "color-mix(in srgb, var(--success-light) 40%, transparent)" : "transparent",
+                  transition:"background 0.2s",
+                }}>
+                  {/* Avatar */}
+                  <div style={{
+                    width:36, height:36, borderRadius:"50%", flexShrink:0,
+                    background:col.bg, color:col.fg,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    fontSize:13, fontWeight:700,
                   }}>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full flex-shrink-0 text-sm font-semibold"
-                    style={{ background: col.bg, color: col.fg }}>
                     {initials(name)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{name}</p>
-                    <p className="text-xs" style={{ color: isPresent ? "var(--success-text)" : "var(--text-tertiary)" }}>
-                      {isPresent ? t("present") : t("absent")}
+
+                  {/* Nome */}
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <p style={{
+                      margin:0, fontSize:14, fontWeight:500,
+                      color:"var(--text-primary)",
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                    }}>
+                      {name}
+                    </p>
+                    <p style={{ margin:0, fontSize:11,
+                      color: isPresent ? "var(--success)" : "var(--text-tertiary)" }}>
+                      {isPresent ? "Presente" : "Assente"}
                     </p>
                   </div>
+
+                  {/* Toggle presenza — grande e touch-friendly */}
                   <button
                     onClick={() => togglePresence(guest.id, group.id, guest.presence)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full flex-shrink-0"
                     style={{
-                      background: isPresent ? "var(--success)" : "var(--bg-secondary)",
-                      border: isPresent ? "none" : "1px solid var(--border)",
-                      cursor: "pointer",
+                      width:44, height:44, borderRadius:"50%", flexShrink:0,
+                      background: isPresent ? "var(--success)" : "var(--bg-primary)",
+                      border: isPresent ? "none" : "2px solid var(--border)",
+                      cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                      transition:"background 0.2s, border 0.2s",
+                      WebkitTapHighlightColor:"transparent",
                     }}
                   >
                     {isPresent
-                      ? <span style={{ color: "#fff", fontSize: 18 }}>✓</span>
-                      : <span style={{ color: "var(--text-tertiary)", fontSize: 18 }}>○</span>}
+                      ? <span style={{ color:"#fff", fontSize:20, lineHeight:1 }}>✓</span>
+                      : <span style={{ color:"var(--text-tertiary)", fontSize:20, lineHeight:1 }}>○</span>}
                   </button>
                 </div>
               );
@@ -276,15 +354,17 @@ export default function Attendance() {
         );
       })}
 
-      {/* Walk-in */}
-      <div className="card mb-3" style={{ padding: 0, overflow: "hidden",
-        border: "1px solid var(--warning)" }}>
-        <div className="flex items-center justify-between px-4 py-3"
-          style={{ background: "var(--warning-light)" }}>
-          <span className="font-semibold text-sm" style={{ color: "var(--warning-text)" }}>
-            Walk-in (non in lista)
+      {/* Walk-in card */}
+      <div style={{ ...cardStyle, border:"1px solid var(--warning)" }}>
+        <div style={{
+          display:"flex", alignItems:"center", justifyContent:"space-between",
+          padding:"11px 16px", borderBottom:"1px solid var(--warning)",
+          background:"var(--warning-light)",
+        }}>
+          <span style={{ fontSize:14, fontWeight:600, color:"var(--warning)" }}>
+            🚶 Walk-in
           </span>
-          <span className="text-xs" style={{ color: "var(--warning-text)" }}>
+          <span style={{ fontSize:12, color:"var(--warning)" }}>
             {walkins.length} {walkins.length === 1 ? "persona" : "persone"}
           </span>
         </div>
@@ -293,44 +373,83 @@ export default function Attendance() {
           const name = `${w.first_name} ${w.last_name || ""}`.trim();
           const col  = avatarColor(w.first_name);
           return (
-            <div key={w.id} className="flex items-center gap-3 px-4 py-2.5"
-              style={{ borderBottom: "1px solid var(--border)" }}>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full flex-shrink-0 text-sm font-semibold"
-                style={{ background: col.bg, color: col.fg }}>
+            <div key={w.id} style={{
+              display:"flex", alignItems:"center", gap:10,
+              padding:"10px 16px", borderBottom:"1px solid var(--border)",
+            }}>
+              <div style={{
+                width:36, height:36, borderRadius:"50%", flexShrink:0,
+                background:col.bg, color:col.fg,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:13, fontWeight:700,
+              }}>
                 {initials(name)}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{name || "Sconosciuto"}</p>
-                <p className="text-xs" style={{ color: "var(--warning-text)" }}>Walk-in</p>
+              <div style={{ flex:1 }}>
+                <p style={{ margin:0, fontSize:14, fontWeight:500, color:"var(--text-primary)" }}>
+                  {name || "Sconosciuto"}
+                </p>
+                <p style={{ margin:0, fontSize:11, color:"var(--warning)" }}>Walk-in</p>
               </div>
               <button onClick={() => deleteWalkin(w.id)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-tertiary)" }}>
-                <Trash2 size={14} />
+                style={{ background:"none", border:"none", cursor:"pointer",
+                  color:"var(--text-tertiary)", display:"flex", padding:4 }}>
+                <Trash2 size={15}/>
               </button>
             </div>
           );
         })}
 
-        {showAddWalkin ? (
-          <div className="px-4 py-3" style={{ borderTop: "1px solid var(--border)" }}>
-            <input type="text" className="input-base mb-2" placeholder={t("name_optional")}
-              value={walkinName} onChange={e => setWalkinName(e.target.value)} />
-            <div className="flex gap-2">
-              <button className="btn-secondary flex-1 py-2 text-sm"
-                onClick={() => { setShowAddWalkin(false); setWalkinName(""); }}>{t("cancel")}</button>
-              <button className="btn-primary flex-1 py-2 text-sm" onClick={addWalkin}>
-                {t("register_walkin")}
+        <button
+          onClick={() => { setWalkinModal(true); setWalkinName(""); }}
+          style={{
+            width:"100%", display:"flex", alignItems:"center", gap:8,
+            padding:"12px 16px", background:"none", border:"none", cursor:"pointer",
+            color:"var(--warning)", fontSize:14, fontWeight:500,
+            WebkitTapHighlightColor:"transparent",
+          }}
+        >
+          <Plus size={16}/> Registra walk-in
+        </button>
+      </div>
+
+      {/* ── Modal walk-in ── */}
+      {walkinModal && (
+        <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) setWalkinModal(false); }}>
+          <div style={sheetStyle}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+              <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:"var(--text-primary)" }}>
+                🚶 Registra walk-in
+              </h2>
+              <button onClick={() => setWalkinModal(false)}
+                style={{ background:"none", border:"none", cursor:"pointer",
+                  color:"var(--text-tertiary)", display:"flex" }}>
+                <X size={22}/>
               </button>
             </div>
+            <div style={{ marginBottom:20 }}>
+              <p style={{ margin:"0 0 6px", fontSize:13, color:"var(--text-tertiary)" }}>
+                Nome (opzionale)
+              </p>
+              <input type="text" style={{ ...inputStyle, fontSize:15 }}
+                placeholder="es. Mario Rossi"
+                value={walkinName} autoFocus
+                onChange={e => setWalkinName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") addWalkin(); }} />
+              <p style={{ margin:"8px 0 0", fontSize:12, color:"var(--text-tertiary)" }}>
+                Se non inserisci il nome verrà registrato come "Sconosciuto"
+              </p>
+            </div>
+            <button onClick={addWalkin} style={{
+              width:"100%", padding:"14px", borderRadius:14,
+              background:"var(--warning)", border:"none", cursor:"pointer",
+              color:"#fff", fontSize:15, fontWeight:700,
+            }}>
+              Registra presenza
+            </button>
           </div>
-        ) : (
-          <button className="w-full flex items-center gap-2 px-4 py-2.5 text-sm"
-            style={{ color: "var(--warning-text)", background: "none", border: "none", cursor: "pointer" }}
-            onClick={() => setShowAddWalkin(true)}>
-            <Plus size={15} /> {t("register_walkin")}
-          </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
